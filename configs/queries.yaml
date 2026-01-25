@@ -1,0 +1,44 @@
+# 調査定義（1件のクエリでも複数クエリでも同じ形式）
+investigations:
+  - name: "決済状況調査"
+    description: "request_id に紐づく決済状況を総合的に調査"
+    parameters:
+      - name: request_id
+        type: string
+        description: "リクエストID"
+    queries:
+      - id: 1
+        name: "決済情報"
+        description: "基本的な決済情報を取得"
+        sql: "SELECT * FROM payments WHERE request_id = {{request_id}}"
+      - id: 2
+        name: "決済ログ"
+        description: "決済処理のログを取得"
+        sql: "SELECT * FROM payment_logs WHERE request_id = {{request_id}} ORDER BY created_at"
+      - id: 3
+        name: "エラー情報"
+        description: "関連するエラー情報を取得"
+        sql: "SELECT * FROM payment_errors WHERE request_id = {{request_id}}"
+
+  - name: "決済ステータス集計"
+    description: "期間内の決済ステータスごとの件数と金額を集計"
+    parameters:
+      - name: start_date
+        type: date
+        description: "開始日 (YYYY-MM-DD)"
+      - name: end_date
+        type: date
+        description: "終了日 (YYYY-MM-DD)"
+    queries:
+      - id: 4
+        name: "ステータス集計"
+        description: "決済ステータスごとの件数と金額"
+        sql: "SELECT status, COUNT(*) as count, SUM(amount) as total_amount FROM payments WHERE created_at BETWEEN {{start_date}} AND {{end_date}} GROUP BY status"
+
+  - name: "システムステータス確認"
+    description: "システムの稼働状況を確認（パラメータ不要）"
+    queries:
+      - id: 5
+        name: "システムステータス"
+        description: "最新のシステムステータス"
+        sql: "SELECT * FROM system_status ORDER BY checked_at DESC LIMIT 1"
