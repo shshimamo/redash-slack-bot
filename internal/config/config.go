@@ -30,6 +30,7 @@ type InvestigationConfig struct {
 	Description         string                   `yaml:"description"`
 	Prompt              string                   `yaml:"prompt"`
 	RedashInstance      string                   `yaml:"redash_instance"`
+	Timeout             string                   `yaml:"timeout"`
 	QueryResultMaxBytes *int                     `yaml:"query_result_max_bytes"`
 	LLMInputMaxBytes    *int                     `yaml:"llm_input_max_bytes"`
 	Parameters          []ParameterConfig        `yaml:"parameters"`

@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 )
 
 // executeInvestigation は調査を実行
@@ -18,13 +19,26 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		return
 	}
 
+	// タイムアウト設定: investigation 指定 → デフォルトの順で適用
+	timeout := h.defaultTimeout
+	if investigation.Timeout != "" {
+		d, err := time.ParseDuration(investigation.Timeout)
+		if err != nil {
+			log.Printf("Warning: invalid timeout %q for investigation %q, using default: %v", investigation.Timeout, investigation.Name, err)
+		} else {
+			timeout = d
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	// パラメータのコピーを作成（元のマップを変更しないため）
 	params := make(map[string]interface{})
 	for k, v := range parameters {
 		params[k] = v
 	}
 
-	log.Printf("Executing investigation: %s with parameters: %v", investigation.Name, params)
+	log.Printf("Executing investigation %q with parameters: %v (timeout: %s)", investigation.Name, params, timeout)
 
 	// クエリ結果サイズ上限: investigation 指定 → デフォルトの順で適用
 	maxBytes := h.queryResultMaxBytes
@@ -43,7 +57,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	for _, resolve := range investigation.ResolveParameters {
 		log.Printf("Resolving parameters: %s (query ID: %d)", resolve.Name, resolve.QueryID)
 
-		result, err := redashClient.ExecuteQuery(resolve.QueryID, params)
+		result, err := redashClient.ExecuteQuery(ctx, resolve.QueryID, params)
 		if err != nil {
 			log.Printf("Warning: resolve query %d failed: %v", resolve.QueryID, err)
 			continue
@@ -113,7 +127,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 
 			log.Printf("Executing query: %s (ID: %d)", name, id)
 
-			result, err := redashClient.ExecuteQuery(id, queryParams)
+			result, err := redashClient.ExecuteQuery(ctx, id, queryParams)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -139,6 +153,13 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		}(q.name, q.id, q.queryParams)
 	}
 	wg.Wait()
+
+	// タイムアウトチェック
+	if ctx.Err() != nil {
+		log.Printf("Investigation %q timed out after %s", investigation.Name, timeout)
+		h.sendMessage(channel, threadTS, fmt.Sprintf("タイムアウト: 調査「%s」が %s 以内に完了しませんでした。", investigation.Name, timeout))
+		return
+	}
 
 	if len(results) == 0 {
 		h.sendMessage(channel, threadTS, "実行できるクエリがありませんでした。パラメータを確認してください。")

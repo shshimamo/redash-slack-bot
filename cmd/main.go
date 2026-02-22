@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/shshimamo/redash-slack-bot/internal/config"
 	"github.com/shshimamo/redash-slack-bot/internal/llm"
@@ -95,8 +96,19 @@ func main() {
 	}
 	log.Printf("LLM input max bytes: %d", llmInputMaxBytes)
 
+	// タイムアウト設定（デフォルト: 120s）
+	defaultTimeout := 120 * time.Second
+	if v := os.Getenv("INVESTIGATION_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			log.Fatalf("INVESTIGATION_TIMEOUT must be a valid positive duration (e.g. 120s, 2m), got: %s", v)
+		}
+		defaultTimeout = d
+	}
+	log.Printf("Investigation default timeout: %s", defaultTimeout)
+
 	// Slack ハンドラ初期化（Socket Mode）
-	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency, queryResultMaxBytes, llmInputMaxBytes)
+	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency, queryResultMaxBytes, llmInputMaxBytes, defaultTimeout)
 
 	// Context with cancel for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -43,6 +44,7 @@ type Handler struct {
 	queryConcurrency    int
 	queryResultMaxBytes int
 	llmInputMaxBytes    int
+	defaultTimeout      time.Duration
 }
 
 // NewHandler は新しいハンドラを作成
@@ -55,6 +57,7 @@ func NewHandler(
 	queryConcurrency int,
 	queryResultMaxBytes int,
 	llmInputMaxBytes int,
+	defaultTimeout time.Duration,
 ) *Handler {
 	slackClient := slack.New(
 		botToken,
@@ -72,6 +75,7 @@ func NewHandler(
 		queryConcurrency:    queryConcurrency,
 		queryResultMaxBytes: queryResultMaxBytes,
 		llmInputMaxBytes:    llmInputMaxBytes,
+		defaultTimeout:      defaultTimeout,
 	}
 }
 

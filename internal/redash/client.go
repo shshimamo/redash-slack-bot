@@ -2,6 +2,7 @@ package redash
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,9 +22,7 @@ func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
 		BaseURL: baseURL,
 		APIKey:  apiKey,
-		client: &http.Client{
-			Timeout: 60 * time.Second,
-		},
+		client:  &http.Client{},
 	}
 }
 
@@ -59,7 +58,7 @@ type Column struct {
 }
 
 // ExecuteQuery は保存済みクエリを実行
-func (c *Client) ExecuteQuery(queryID int, parameters map[string]interface{}) (*QueryResultData, error) {
+func (c *Client) ExecuteQuery(ctx context.Context, queryID int, parameters map[string]interface{}) (*QueryResultData, error) {
 	url := fmt.Sprintf("%s/api/queries/%d/results", c.BaseURL, queryID)
 
 	var body io.Reader
@@ -74,7 +73,7 @@ func (c *Client) ExecuteQuery(queryID int, parameters map[string]interface{}) (*
 		body = bytes.NewBuffer(data)
 	}
 
-	req, err := http.NewRequest("POST", url, body)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -103,7 +102,7 @@ func (c *Client) ExecuteQuery(queryID int, parameters map[string]interface{}) (*
 	if result.QueryResult != nil {
 		rawData = result.QueryResult.Data
 	} else if result.Job != nil {
-		rawData, err = c.waitForJob(result.Job.ID)
+		rawData, err = c.waitForJob(ctx, result.Job.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -120,10 +119,10 @@ func (c *Client) ExecuteQuery(queryID int, parameters map[string]interface{}) (*
 }
 
 // fetchQueryResult は query_result_id から結果データを取得
-func (c *Client) fetchQueryResult(queryResultID int) (json.RawMessage, error) {
+func (c *Client) fetchQueryResult(ctx context.Context, queryResultID int) (json.RawMessage, error) {
 	url := fmt.Sprintf("%s/api/query_results/%d", c.BaseURL, queryResultID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create query result request: %w", err)
 	}
@@ -146,17 +145,20 @@ func (c *Client) fetchQueryResult(queryResultID int) (json.RawMessage, error) {
 }
 
 // waitForJob はジョブの完了を待機
-func (c *Client) waitForJob(jobID string) (json.RawMessage, error) {
+func (c *Client) waitForJob(ctx context.Context, jobID string) (json.RawMessage, error) {
 	url := fmt.Sprintf("%s/api/jobs/%s", c.BaseURL, jobID)
 
-	for i := 0; i < 60; i++ {
-		time.Sleep(1 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("job polling cancelled: %w", ctx.Err())
+		case <-time.After(1 * time.Second):
+		}
 
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create job status request: %w", err)
 		}
-
 		req.Header.Set("Authorization", fmt.Sprintf("Key %s", c.APIKey))
 
 		resp, err := c.client.Do(req)
@@ -179,15 +181,11 @@ func (c *Client) waitForJob(jobID string) (json.RawMessage, error) {
 				return jobResp.Job.QueryResult.Data, nil
 			}
 			if jobResp.Job.QueryResultID != 0 {
-				return c.fetchQueryResult(jobResp.Job.QueryResultID)
+				return c.fetchQueryResult(ctx, jobResp.Job.QueryResultID)
 			}
 			return nil, fmt.Errorf("query succeeded but no result data")
 		case 4: // Failure
 			return nil, fmt.Errorf("query failed: %s", jobResp.Job.Error)
-		case 1, 2: // Pending or Started
-			continue
 		}
 	}
-
-	return nil, fmt.Errorf("query timeout: job did not complete in 60 seconds")
 }

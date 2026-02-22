@@ -5,6 +5,7 @@ redash_instances:
     api_key_env: "REDASH_API_KEY"
 
 # 調査定義（1件のクエリでも複数クエリでも同じ形式）
+# timeout:               タイムアウト (例: 60s, 2m)。未指定は INVESTIGATION_TIMEOUT 環境変数を使用
 # query_result_max_bytes: クエリ1件あたりの結果サイズ上限 (bytes)。未指定は QUERY_RESULT_MAX_BYTES 環境変数を使用。0 で無制限
 # llm_input_max_bytes:    LLM への入力合計 (prompt + schema + 全クエリ結果) のサイズ上限 (bytes)。未指定は LLM_INPUT_MAX_BYTES 環境変数を使用。0 で無制限
 investigations:
@@ -12,6 +13,7 @@ investigations:
     description: "request_id に紐づく決済状況を総合的に調査"
     prompt: error_investigation.txt
     redash_instance: "default"
+    timeout: "120s"
     query_result_max_bytes: 10000
     schemas:
       - test_db.json
@@ -40,6 +42,7 @@ investigations:
     description: "期間内の決済ステータスごとの件数と金額を集計"
     prompt: error_investigation.txt
     redash_instance: "default"
+    timeout: "120s"
     query_result_max_bytes: 10000
     schemas:
       - test_db.json
@@ -62,6 +65,7 @@ investigations:
     description: "システムの稼働状況を確認（パラメータ不要）"
     prompt: error_investigation.txt
     redash_instance: "default"
+    timeout: "120s"
     query_result_max_bytes: 10000
     queries:
       - id: 5
@@ -72,6 +76,7 @@ investigations:
     description: "request_id から payment_id と user_id を自動解決し、決済詳細とユーザー情報を取得"
     prompt: error_investigation.txt
     redash_instance: "default"
+    timeout: "120s"
     query_result_max_bytes: 10000
     schemas:
       - test_db.json
