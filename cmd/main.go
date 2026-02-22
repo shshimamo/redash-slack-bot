@@ -22,6 +22,7 @@ func main() {
 	anthropicAPIKey := mustGetEnv("ANTHROPIC_API_KEY")
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
 	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
+	promptsDir := getEnv("PROMPTS_DIR", "configs/prompts")
 
 	// 設定ファイル読み込み
 	cfg, err := config.LoadConfig(configPath)
@@ -33,6 +34,11 @@ func main() {
 	// investigation ごとのスキーマファイル読み込み
 	if err := cfg.LoadInvestigationSchemas(schemasDir); err != nil {
 		log.Printf("Warning: Failed to load investigation schemas: %v", err)
+	}
+
+	// investigation ごとのプロンプトファイル読み込み
+	if err := cfg.LoadInvestigationPrompts(promptsDir); err != nil {
+		log.Printf("Warning: Failed to load investigation prompts: %v", err)
 	}
 
 	// Anthropic クライアント初期化

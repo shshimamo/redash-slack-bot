@@ -13,12 +13,14 @@ import (
 type Config struct {
 	Investigations []InvestigationConfig `yaml:"investigations"`
 	schemaCache    map[string]string
+	promptCache    map[string]string
 }
 
 // InvestigationConfig は調査の定義（1件でも複数クエリでも同じ形式）
 type InvestigationConfig struct {
 	Name              string                   `yaml:"name"`
 	Description       string                   `yaml:"description"`
+	Prompt            string                   `yaml:"prompt"`
 	Parameters        []ParameterConfig        `yaml:"parameters"`
 	ResolveParameters []ResolveParameterConfig `yaml:"resolve_parameters"`
 	Queries           []QueryConfig            `yaml:"queries"`
@@ -92,6 +94,43 @@ func (c *Config) LoadInvestigationSchemas(schemasDir string) error {
 	}
 
 	return nil
+}
+
+// LoadInvestigationPrompts は configs/prompts/ 配下のプロンプトファイルを読み込む
+func (c *Config) LoadInvestigationPrompts(promptsDir string) error {
+	c.promptCache = make(map[string]string)
+
+	// default.txt は常に読み込む
+	files := map[string]bool{"default.txt": true}
+	for _, inv := range c.Investigations {
+		if inv.Prompt != "" {
+			files[inv.Prompt] = true
+		}
+	}
+
+	for file := range files {
+		path := filepath.Join(promptsDir, file)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read prompt file %s: %w", file, err)
+		}
+		c.promptCache[file] = string(data)
+		fmt.Printf("Loaded prompt: %s\n", file)
+	}
+
+	return nil
+}
+
+// GetInvestigationPrompt は investigation のプロンプトを返す。未指定の場合は default.txt を使用
+func (c *Config) GetInvestigationPrompt(inv *InvestigationConfig) string {
+	if c.promptCache == nil {
+		return ""
+	}
+	file := inv.Prompt
+	if file == "" {
+		file = "default.txt"
+	}
+	return c.promptCache[file]
 }
 
 // FormatInvestigationSchemas は investigation のスキーマ情報を LLM 向けにフォーマット

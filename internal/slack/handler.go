@@ -424,8 +424,9 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	}
 
 	// 結果を分析
+	systemPrompt := h.config.GetInvestigationPrompt(investigation)
 	schemaInfo := h.config.FormatInvestigationSchemas(investigation)
-	analysis, err := h.llmClient.AnalyzeResults(ctx, results, schemaInfo)
+	analysis, err := h.llmClient.AnalyzeResults(ctx, results, systemPrompt, schemaInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
 		var sb strings.Builder

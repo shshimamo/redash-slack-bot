@@ -53,23 +53,7 @@ func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (
 }
 
 // AnalyzeResults はクエリ結果を分析して要約を生成
-func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, schemaInfo string) (string, error) {
-	systemPrompt := `あなたはエラー調査アシスタントです。
-クエリ結果をもとに、エラーや異常の有無を調査し、簡潔に報告してください。
-
-回答の構成：
-1. エラー・異常の有無（まず最初に明示する）
-2. エラーがある場合：
-   - エラーメッセージの内容
-   - 問題のあるレコードやカラム（IDや識別子を示す）
-   - NULL・欠損・不整合など異常な値の指摘
-3. エラーがない場合：正常である旨を一言で
-
-回答のガイドライン：
-- 簡潔でわかりやすい日本語で回答
-- 個別レコードの詳細な値の羅列は不要
-- 複数のデータソースがある場合は横断的に分析する`
-
+func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, systemPrompt, schemaInfo string) (string, error) {
 	if schemaInfo != "" {
 		systemPrompt += "\n\n" + schemaInfo
 	}
