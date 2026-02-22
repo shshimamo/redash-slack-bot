@@ -1,8 +1,15 @@
+# Redash インスタンス定義（デフォルトは REDASH_URL / REDASH_API_KEY 環境変数を使用）
+redash_instances:
+  - name: "default"
+    url_env: "REDASH_URL"
+    api_key_env: "REDASH_API_KEY"
+
 # 調査定義（1件のクエリでも複数クエリでも同じ形式）
 investigations:
   - name: "決済状況調査"
     description: "request_id に紐づく決済状況を総合的に調査"
     prompt: error_investigation.txt
+    redash_instance: "default"
     schemas:
       - test_db.json
     parameters:
@@ -29,6 +36,7 @@ investigations:
   - name: "決済ステータス集計"
     description: "期間内の決済ステータスごとの件数と金額を集計"
     prompt: error_investigation.txt
+    redash_instance: "default"
     schemas:
       - test_db.json
     parameters:
@@ -49,6 +57,7 @@ investigations:
   - name: "システムステータス確認"
     description: "システムの稼働状況を確認（パラメータ不要）"
     prompt: error_investigation.txt
+    redash_instance: "default"
     queries:
       - id: 5
         name: "システムステータス"
@@ -57,6 +66,7 @@ investigations:
   - name: "決済詳細調査"
     description: "request_id から payment_id と user_id を自動解決し、決済詳細とユーザー情報を取得"
     prompt: error_investigation.txt
+    redash_instance: "default"
     schemas:
       - test_db.json
     parameters:

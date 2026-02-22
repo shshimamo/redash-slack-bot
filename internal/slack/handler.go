@@ -36,7 +36,7 @@ type Handler struct {
 	slackClient     *slack.Client
 	socketClient    *socketmode.Client
 	llmClient       *llm.Client
-	redashClient    *redash.Client
+	redashClients   map[string]*redash.Client
 	config          *config.Config
 	pendingRequests map[string]pendingRequest
 	mu              sync.Mutex
@@ -47,7 +47,7 @@ func NewHandler(
 	botToken string,
 	appToken string,
 	llmClient *llm.Client,
-	redashClient *redash.Client,
+	redashClients map[string]*redash.Client,
 	cfg *config.Config,
 ) *Handler {
 	slackClient := slack.New(
@@ -60,10 +60,24 @@ func NewHandler(
 		slackClient:     slackClient,
 		socketClient:    socketClient,
 		llmClient:       llmClient,
-		redashClient:    redashClient,
+		redashClients:   redashClients,
 		config:          cfg,
 		pendingRequests: make(map[string]pendingRequest),
 	}
+}
+
+// redashClientFor は investigation の redash_instance に対応するクライアントを返す
+// redash_instance が未指定または未定義の場合はエラーを返す
+func (h *Handler) redashClientFor(investigation *config.InvestigationConfig) (*redash.Client, error) {
+	key := investigation.RedashInstance
+	if key == "" {
+		return nil, fmt.Errorf("investigation %q: redash_instance is not specified", investigation.Name)
+	}
+	client, ok := h.redashClients[key]
+	if !ok {
+		return nil, fmt.Errorf("investigation %q: redash_instance %q is not defined", investigation.Name, key)
+	}
+	return client, nil
 }
 
 // Run は Socket Mode でイベントを受信し続ける
@@ -352,11 +366,18 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 
 	log.Printf("Executing investigation: %s with parameters: %v", investigation.Name, params)
 
+	redashClient, err := h.redashClientFor(investigation)
+	if err != nil {
+		log.Printf("Error: %v", err)
+		h.sendMessage(channel, threadTS, fmt.Sprintf("設定エラー: %v", err))
+		return
+	}
+
 	// resolve_parameters フェーズ: 追加パラメータをクエリで解決
 	for _, resolve := range investigation.ResolveParameters {
 		log.Printf("Resolving parameters: %s (query ID: %d)", resolve.Name, resolve.QueryID)
 
-		result, err := h.redashClient.ExecuteQuery(resolve.QueryID, params)
+		result, err := redashClient.ExecuteQuery(resolve.QueryID, params)
 		if err != nil {
 			log.Printf("Warning: resolve query %d failed: %v", resolve.QueryID, err)
 			continue
@@ -401,7 +422,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 
 		// required_parameters で指定されたパラメータのみ渡す
 		queryParams := filterParams(query.RequiredParameters, params)
-		result, err := h.redashClient.ExecuteQuery(query.ID, queryParams)
+		result, err := redashClient.ExecuteQuery(query.ID, queryParams)
 		if err != nil {
 			log.Printf("Error executing query %d: %v", query.ID, err)
 			results[query.Name] = fmt.Sprintf("エラー: %v", err)

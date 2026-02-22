@@ -1,4 +1,4 @@
-.PHONY: build run dev docker-build docker-run clean schema
+.PHONY: build run dev docker-build docker-run clean schema validate
 
 # ローカルビルド
 build:
@@ -36,6 +36,10 @@ schema:
 		-t json \
 		-o configs/schemas/test_db.json \
 		"postgres://postgres:password@host.docker.internal:5432/test_db?sslmode=disable"
+
+# 設定ファイルのバリデーション
+validate:
+	go run ./cmd/validate/ configs/queries.yaml
 
 # クリーンアップ
 clean:

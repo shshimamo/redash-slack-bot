@@ -9,11 +9,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// RedashInstanceConfig は Redash インスタンスの接続情報定義
+type RedashInstanceConfig struct {
+	Name      string `yaml:"name"`
+	URLEnv    string `yaml:"url_env"`
+	APIKeyEnv string `yaml:"api_key_env"`
+}
+
 // Config はアプリケーション全体の設定
 type Config struct {
-	Investigations []InvestigationConfig `yaml:"investigations"`
-	schemaCache    map[string]string
-	promptCache    map[string]string
+	RedashInstances []RedashInstanceConfig `yaml:"redash_instances"`
+	Investigations  []InvestigationConfig  `yaml:"investigations"`
+	schemaCache     map[string]string
+	promptCache     map[string]string
 }
 
 // InvestigationConfig は調査の定義（1件でも複数クエリでも同じ形式）
@@ -21,6 +29,7 @@ type InvestigationConfig struct {
 	Name              string                   `yaml:"name"`
 	Description       string                   `yaml:"description"`
 	Prompt            string                   `yaml:"prompt"`
+	RedashInstance    string                   `yaml:"redash_instance"`
 	Parameters        []ParameterConfig        `yaml:"parameters"`
 	ResolveParameters []ResolveParameterConfig `yaml:"resolve_parameters"`
 	Queries           []QueryConfig            `yaml:"queries"`
@@ -149,6 +158,36 @@ func (c *Config) FormatInvestigationSchemas(inv *InvestigationConfig) string {
 		sb.WriteString("\n")
 	}
 	return sb.String()
+}
+
+// Validate は設定の整合性を検証する
+func (c *Config) Validate() error {
+	// redash_instances の名前セットを構築しつつ必須フィールドをチェック
+	instanceNames := make(map[string]bool)
+	for _, inst := range c.RedashInstances {
+		if inst.Name == "" {
+			return fmt.Errorf("redash_instances: name is required")
+		}
+		if inst.URLEnv == "" {
+			return fmt.Errorf("redash_instances[%s]: url_env is required", inst.Name)
+		}
+		if inst.APIKeyEnv == "" {
+			return fmt.Errorf("redash_instances[%s]: api_key_env is required", inst.Name)
+		}
+		instanceNames[inst.Name] = true
+	}
+
+	// 全 investigation が有効な redash_instance を参照しているか検証
+	for _, inv := range c.Investigations {
+		if inv.RedashInstance == "" {
+			return fmt.Errorf("investigation %q: redash_instance is required", inv.Name)
+		}
+		if !instanceNames[inv.RedashInstance] {
+			return fmt.Errorf("investigation %q: redash_instance %q is not defined in redash_instances", inv.Name, inv.RedashInstance)
+		}
+	}
+
+	return nil
 }
 
 // GetInvestigationByName は指定された名前の調査を取得

@@ -17,8 +17,6 @@ func main() {
 	// 環境変数から設定を読み込み
 	slackBotToken := mustGetEnv("SLACK_BOT_TOKEN")
 	slackAppToken := mustGetEnv("SLACK_APP_TOKEN") // Socket Mode 用
-	redashURL := mustGetEnv("REDASH_URL")
-	redashAPIKey := mustGetEnv("REDASH_API_KEY")
 	anthropicAPIKey := mustGetEnv("ANTHROPIC_API_KEY")
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
 	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
@@ -30,6 +28,11 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 	log.Printf("Loaded %d investigations from config", len(cfg.Investigations))
+
+	// 設定の整合性チェック
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Config validation failed: %v", err)
+	}
 
 	// investigation ごとのスキーマファイル読み込み
 	if err := cfg.LoadInvestigationSchemas(schemasDir); err != nil {
@@ -45,12 +48,21 @@ func main() {
 	llmClient := llm.NewClient(anthropicAPIKey)
 	log.Println("Anthropic client initialized (claude-3-haiku)")
 
-	// Redash クライアント初期化
-	redashClient := redash.NewClient(redashURL, redashAPIKey)
-	log.Println("Redash client initialized")
+	// Redash クライアント初期化（redash_instances の定義に基づく）
+	redashClients := make(map[string]*redash.Client)
+	for _, inst := range cfg.RedashInstances {
+		url := os.Getenv(inst.URLEnv)
+		apiKey := os.Getenv(inst.APIKeyEnv)
+		if url == "" || apiKey == "" {
+			log.Fatalf("Redash instance %q: env vars %s and %s must be set", inst.Name, inst.URLEnv, inst.APIKeyEnv)
+		}
+		redashClients[inst.Name] = redash.NewClient(url, apiKey)
+		log.Printf("Redash client initialized for instance: %s", inst.Name)
+	}
+	log.Printf("Redash clients initialized (%d instances)", len(redashClients))
 
 	// Slack ハンドラ初期化（Socket Mode）
-	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClient, cfg)
+	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg)
 
 	// Context with cancel for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
