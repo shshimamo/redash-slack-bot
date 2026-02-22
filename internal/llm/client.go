@@ -2,7 +2,6 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -44,7 +43,6 @@ func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (
 		return "", fmt.Errorf("empty response from model")
 	}
 
-	// TextBlock から Text を取得
 	for _, block := range message.Content {
 		if block.Type == "text" {
 			return block.Text, nil
@@ -52,79 +50,6 @@ func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (
 	}
 
 	return "", fmt.Errorf("no text content in response")
-}
-
-// SelectionResult は調査選択の結果
-type SelectionResult struct {
-	InvestigationName string                 `json:"investigation_name"`
-	Parameters        map[string]interface{} `json:"parameters"`
-	Reasoning         string                 `json:"reasoning"`
-	CanHandle         bool                   `json:"can_handle"`
-	Message           string                 `json:"message"`
-}
-
-// SelectQuery はユーザーのメッセージから実行すべき調査を判定
-func (c *Client) SelectQuery(ctx context.Context, userMessage, queriesInfo, schemaInfo string) (*SelectionResult, error) {
-	systemPrompt := `あなたは Redash クエリ選択アシスタントです。
-ユーザーのリクエストを分析し、適切な調査を選択してください。
-
-以下の情報を参考にしてください：
-
-` + queriesInfo
-
-	if schemaInfo != "" {
-		systemPrompt += `
-
-` + schemaInfo
-	}
-
-	systemPrompt += `
-
-必ず以下のJSON形式で回答してください：
-
-調査を選択する場合：
-{
-  "can_handle": true,
-  "investigation_name": "調査の名前",
-  "parameters": {"パラメータ名": 値},
-  "reasoning": "選択理由の説明"
-}
-
-対応できない場合：
-{
-  "can_handle": false,
-  "message": "ユーザーへのメッセージ"
-}
-
-注意：
-- パラメータの値はユーザーのメッセージから抽出してください
-- 適切な調査が見つからない場合は can_handle を false にしてください
-- JSONのみを出力してください`
-
-	response, err := c.Invoke(ctx, systemPrompt, userMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	// JSONを抽出（余分なテキストがある場合に対応）
-	response = extractJSON(response)
-
-	var result SelectionResult
-	if err := json.Unmarshal([]byte(response), &result); err != nil {
-		return nil, fmt.Errorf("failed to parse selection result: %w, response: %s", err, response)
-	}
-
-	return &result, nil
-}
-
-// extractJSON はレスポンスからJSON部分を抽出
-func extractJSON(s string) string {
-	start := strings.Index(s, "{")
-	end := strings.LastIndex(s, "}")
-	if start != -1 && end != -1 && end > start {
-		return s[start : end+1]
-	}
-	return s
 }
 
 // AnalyzeResults はクエリ結果を分析して要約を生成

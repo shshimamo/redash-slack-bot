@@ -122,25 +122,3 @@ func (c *Config) GetInvestigationByName(name string) *InvestigationConfig {
 	return nil
 }
 
-// FormatForLLM は LLM 向けに調査一覧を整形
-func (c *Config) FormatForLLM() string {
-	var sb strings.Builder
-
-	sb.WriteString("=== 利用可能な調査 ===\n")
-	for _, inv := range c.Investigations {
-		sb.WriteString(fmt.Sprintf("\n【%s】\n", inv.Name))
-		sb.WriteString(fmt.Sprintf("  説明: %s\n", inv.Description))
-		if len(inv.Parameters) > 0 {
-			sb.WriteString("  パラメータ:\n")
-			for _, p := range inv.Parameters {
-				sb.WriteString(fmt.Sprintf("    - %s (%s): %s\n", p.Name, p.Type, p.Description))
-			}
-		}
-		sb.WriteString(fmt.Sprintf("  実行されるクエリ: %d件\n", len(inv.Queries)))
-		for _, q := range inv.Queries {
-			sb.WriteString(fmt.Sprintf("    - %s: %s\n", q.Name, q.Description))
-		}
-	}
-
-	return sb.String()
-}
