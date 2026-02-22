@@ -23,7 +23,7 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 		}
 	}
 
-	log.Printf("Processing message from user %s: %s", user, cleanText)
+	log.Printf("Processing message from user %s", user)
 
 	// requestID は channel + threadTS で一意に識別
 	requestID := fmt.Sprintf("%s_%s", channel, threadTS)

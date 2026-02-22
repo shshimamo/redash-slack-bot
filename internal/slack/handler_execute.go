@@ -38,7 +38,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		params[k] = v
 	}
 
-	log.Printf("Executing investigation %q with parameters: %v (timeout: %s)", investigation.Name, params, timeout)
+	log.Printf("Executing investigation %q with %d parameters (timeout: %s)", investigation.Name, len(params), timeout)
 
 	// クエリ結果サイズ上限: investigation 指定 → デフォルトの順で適用
 	maxBytes := h.queryResultMaxBytes
@@ -78,7 +78,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		for _, output := range resolve.Outputs {
 			if val, ok := row[output.Field]; ok {
 				params[output.Name] = val
-				log.Printf("Resolved parameter %s = %v", output.Name, val)
+				log.Printf("Resolved parameter %s", output.Name)
 			} else {
 				log.Printf("Warning: field %q not found in resolve query %d result", output.Field, resolve.QueryID)
 			}
@@ -150,6 +150,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 				return
 			}
 			results[name] = string(resultJSON)
+			log.Printf("Query %q (ID: %d) completed: %d rows, %d bytes", name, id, len(result.Rows), len(resultJSON))
 		}(q.name, q.id, q.queryParams)
 	}
 	wg.Wait()
@@ -187,6 +188,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		}
 	}
 
+	log.Printf("Analyzing results for investigation %q (%d queries)", investigation.Name, len(results))
 	analysis, err := h.llmClient.AnalyzeResults(ctx, results, systemPrompt, schemaInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
@@ -200,6 +202,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	}
 
 	h.sendMessage(channel, threadTS, analysis)
+	log.Printf("Investigation %q completed successfully", investigation.Name)
 }
 
 // filterParams は required で指定されたキーのみ抽出して返す
