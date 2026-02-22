@@ -21,7 +21,7 @@ func main() {
 	redashAPIKey := mustGetEnv("REDASH_API_KEY")
 	anthropicAPIKey := mustGetEnv("ANTHROPIC_API_KEY")
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
-	schemaPath := getEnv("SCHEMA_PATH", "") // オプション
+	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
 
 	// 設定ファイル読み込み
 	cfg, err := config.LoadConfig(configPath)
@@ -30,13 +30,9 @@ func main() {
 	}
 	log.Printf("Loaded %d investigations from config", len(cfg.Investigations))
 
-	// スキーマファイル読み込み（オプション）
-	if schemaPath != "" {
-		if err := cfg.LoadSchema(schemaPath); err != nil {
-			log.Printf("Warning: Failed to load schema file: %v", err)
-		} else {
-			log.Printf("Loaded schema: %s (%d tables)", cfg.Schema.Name, len(cfg.Schema.Tables))
-		}
+	// investigation ごとのスキーマファイル読み込み
+	if err := cfg.LoadInvestigationSchemas(schemasDir); err != nil {
+		log.Printf("Warning: Failed to load investigation schemas: %v", err)
 	}
 
 	// Anthropic クライアント初期化

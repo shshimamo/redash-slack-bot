@@ -128,7 +128,7 @@ func extractJSON(s string) string {
 }
 
 // AnalyzeResults はクエリ結果を分析して要約を生成
-func (c *Client) AnalyzeResults(ctx context.Context, userMessage string, results map[string]string) (string, error) {
+func (c *Client) AnalyzeResults(ctx context.Context, userMessage string, results map[string]string, schemaInfo string) (string, error) {
 	systemPrompt := `あなたはデータ分析アシスタントです。
 ユーザーの質問に対して、クエリ結果を分析し、わかりやすく要約して回答してください。
 
@@ -138,6 +138,10 @@ func (c *Client) AnalyzeResults(ctx context.Context, userMessage string, results
 - 重要なポイントを箇条書きで整理
 - 数値は適切にフォーマット（カンマ区切りなど）
 - ユーザーの質問に直接答える形式で`
+
+	if schemaInfo != "" {
+		systemPrompt += "\n\n" + schemaInfo
+	}
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("質問: %s\n\n", userMessage))

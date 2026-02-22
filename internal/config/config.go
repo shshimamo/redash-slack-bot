@@ -1,9 +1,9 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -12,7 +12,7 @@ import (
 // Config はアプリケーション全体の設定
 type Config struct {
 	Investigations []InvestigationConfig `yaml:"investigations"`
-	Schema         *TblsSchema           // tbls の schema.json（オプション）
+	schemaCache    map[string]string
 }
 
 // InvestigationConfig は調査の定義（1件でも複数クエリでも同じ形式）
@@ -22,6 +22,7 @@ type InvestigationConfig struct {
 	Parameters        []ParameterConfig        `yaml:"parameters"`
 	ResolveParameters []ResolveParameterConfig `yaml:"resolve_parameters"`
 	Queries           []QueryConfig            `yaml:"queries"`
+	Schemas           []string                 `yaml:"schemas"`
 }
 
 // ResolveParameterConfig はパラメータ解決クエリの定義
@@ -39,10 +40,10 @@ type ResolveOutputConfig struct {
 
 // QueryConfig は Redash クエリの定義
 type QueryConfig struct {
-	ID                   int      `yaml:"id"`
-	Name                 string   `yaml:"name"`
-	Description          string   `yaml:"description"`
-	RequiredParameters   []string `yaml:"required_parameters"`
+	ID                 int      `yaml:"id"`
+	Name               string   `yaml:"name"`
+	Description        string   `yaml:"description"`
+	RequiredParameters []string `yaml:"required_parameters"`
 }
 
 // ParameterConfig はクエリパラメータの定義
@@ -50,41 +51,6 @@ type ParameterConfig struct {
 	Name        string `yaml:"name"`
 	Type        string `yaml:"type"`
 	Description string `yaml:"description"`
-}
-
-// TblsSchema は tbls の schema.json 形式
-type TblsSchema struct {
-	Name      string     `json:"name"`
-	Tables    []Table    `json:"tables"`
-	Relations []Relation `json:"relations,omitempty"`
-}
-
-// Table はテーブル定義
-type Table struct {
-	Name    string   `json:"name"`
-	Type    string   `json:"type,omitempty"`
-	Comment string   `json:"comment,omitempty"`
-	Columns []Column `json:"columns"`
-}
-
-// Column はカラム定義
-type Column struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Nullable bool   `json:"nullable"`
-	Default  string `json:"default,omitempty"`
-	Comment  string `json:"comment,omitempty"`
-	PK       bool   `json:"pk,omitempty"`
-	FK       bool   `json:"fk,omitempty"`
-}
-
-// Relation はテーブル間のリレーション
-type Relation struct {
-	Table         string   `json:"table"`
-	Columns       []string `json:"columns"`
-	ParentTable   string   `json:"parent_table"`
-	ParentColumns []string `json:"parent_columns"`
-	Cardinality   string   `json:"cardinality,omitempty"`
 }
 
 // LoadConfig は queries.yaml を読み込む
@@ -102,20 +68,48 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-// LoadSchema は tbls の schema.json を読み込んで Config に追加
-func (c *Config) LoadSchema(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("failed to read schema file: %w", err)
+// LoadInvestigationSchemas は configs/schemas/ 配下のスキーマファイルを読み込む
+func (c *Config) LoadInvestigationSchemas(schemasDir string) error {
+	c.schemaCache = make(map[string]string)
+
+	// 全 investigation が参照するスキーマファイルを収集
+	seen := make(map[string]bool)
+	for _, inv := range c.Investigations {
+		for _, schemaFile := range inv.Schemas {
+			seen[schemaFile] = true
+		}
 	}
 
-	var schema TblsSchema
-	if err := json.Unmarshal(data, &schema); err != nil {
-		return fmt.Errorf("failed to parse schema file: %w", err)
+	// 各スキーマファイルを読み込む
+	for schemaFile := range seen {
+		path := filepath.Join(schemasDir, schemaFile)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read schema file %s: %w", schemaFile, err)
+		}
+		c.schemaCache[schemaFile] = string(data)
+		fmt.Printf("Loaded schema: %s\n", schemaFile)
 	}
 
-	c.Schema = &schema
 	return nil
+}
+
+// FormatInvestigationSchemas は investigation のスキーマ情報を LLM 向けにフォーマット
+func (c *Config) FormatInvestigationSchemas(inv *InvestigationConfig) string {
+	if len(inv.Schemas) == 0 || c.schemaCache == nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	for _, schemaFile := range inv.Schemas {
+		content, ok := c.schemaCache[schemaFile]
+		if !ok {
+			continue
+		}
+		sb.WriteString(content)
+		sb.WriteString("\n")
+	}
+	return sb.String()
 }
 
 // GetInvestigationByName は指定された名前の調査を取得
@@ -145,65 +139,6 @@ func (c *Config) FormatForLLM() string {
 		sb.WriteString(fmt.Sprintf("  実行されるクエリ: %d件\n", len(inv.Queries)))
 		for _, q := range inv.Queries {
 			sb.WriteString(fmt.Sprintf("    - %s: %s\n", q.Name, q.Description))
-		}
-	}
-
-	return sb.String()
-}
-
-// FormatQueriesForLLM は LLM 向けに調査一覧を整形（後方互換性のため残す）
-func (c *Config) FormatQueriesForLLM() string {
-	return c.FormatForLLM()
-}
-
-// FormatSchemaForLLM は LLM 向けにスキーマ情報を整形
-func (c *Config) FormatSchemaForLLM() string {
-	if c.Schema == nil {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("データベーススキーマ (%s):\n\n", c.Schema.Name))
-
-	for _, table := range c.Schema.Tables {
-		sb.WriteString(fmt.Sprintf("テーブル: %s", table.Name))
-		if table.Comment != "" {
-			sb.WriteString(fmt.Sprintf(" - %s", table.Comment))
-		}
-		sb.WriteString("\n")
-
-		for _, col := range table.Columns {
-			nullable := "NOT NULL"
-			if col.Nullable {
-				nullable = "NULL"
-			}
-			pk := ""
-			if col.PK {
-				pk = " [PK]"
-			}
-			fk := ""
-			if col.FK {
-				fk = " [FK]"
-			}
-
-			sb.WriteString(fmt.Sprintf("  - %s: %s %s%s%s", col.Name, col.Type, nullable, pk, fk))
-			if col.Comment != "" {
-				sb.WriteString(fmt.Sprintf(" -- %s", col.Comment))
-			}
-			sb.WriteString("\n")
-		}
-		sb.WriteString("\n")
-	}
-
-	if len(c.Schema.Relations) > 0 {
-		sb.WriteString("リレーション:\n")
-		for _, rel := range c.Schema.Relations {
-			sb.WriteString(fmt.Sprintf("  - %s.%s -> %s.%s\n",
-				rel.Table,
-				strings.Join(rel.Columns, ", "),
-				rel.ParentTable,
-				strings.Join(rel.ParentColumns, ", "),
-			))
 		}
 	}
 

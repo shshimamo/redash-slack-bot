@@ -428,7 +428,8 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, u
 	}
 
 	// 結果を分析
-	analysis, err := h.llmClient.AnalyzeResults(ctx, userMessage, results)
+	schemaInfo := h.config.FormatInvestigationSchemas(investigation)
+	analysis, err := h.llmClient.AnalyzeResults(ctx, userMessage, results, schemaInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
 		var sb strings.Builder

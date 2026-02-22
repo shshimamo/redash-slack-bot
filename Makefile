@@ -1,4 +1,4 @@
-.PHONY: build run dev docker-build docker-run clean
+.PHONY: build run dev docker-build docker-run clean schema
 
 # ローカルビルド
 build:
@@ -29,6 +29,13 @@ docker-build:
 # Docker 実行
 docker-run:
 	docker compose up --build
+
+# スキーマ生成 (tbls)
+schema:
+	docker run --rm -v $$(pwd):/work -w /work ghcr.io/k1low/tbls out \
+		-t json \
+		-o configs/schemas/test_db.json \
+		"postgres://postgres:password@host.docker.internal:5432/test_db?sslmode=disable"
 
 # クリーンアップ
 clean:

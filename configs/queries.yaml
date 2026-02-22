@@ -2,6 +2,8 @@
 investigations:
   - name: "決済状況調査"
     description: "request_id に紐づく決済状況を総合的に調査"
+    schemas:
+      - test_db.json
     parameters:
       - name: request_id
         type: string
@@ -25,6 +27,8 @@ investigations:
 
   - name: "決済ステータス集計"
     description: "期間内の決済ステータスごとの件数と金額を集計"
+    schemas:
+      - test_db.json
     parameters:
       - name: start_date
         type: date
@@ -49,6 +53,8 @@ investigations:
 
   - name: "決済詳細調査"
     description: "request_id から payment_id と user_id を自動解決し、決済詳細とユーザー情報を取得"
+    schemas:
+      - test_db.json
     parameters:
       - name: request_id
         type: string
