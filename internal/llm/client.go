@@ -129,15 +129,21 @@ func extractJSON(s string) string {
 
 // AnalyzeResults はクエリ結果を分析して要約を生成
 func (c *Client) AnalyzeResults(ctx context.Context, userMessage string, results map[string]string, schemaInfo string) (string, error) {
-	systemPrompt := `あなたはデータ分析アシスタントです。
-ユーザーの質問に対して、クエリ結果を分析し、わかりやすく要約して回答してください。
+	systemPrompt := `あなたはエラー調査アシスタントです。
+クエリ結果をもとに、エラーや異常の有無を調査し、簡潔に報告してください。
+
+回答の構成：
+1. エラー・異常の有無（まず最初に明示する）
+2. エラーがある場合：
+   - エラーメッセージの内容
+   - 問題のあるレコードやカラム（IDや識別子を示す）
+   - NULL・欠損・不整合など異常な値の指摘
+3. エラーがない場合：正常である旨を一言で
 
 回答のガイドライン：
 - 簡潔でわかりやすい日本語で回答
-- 複数のデータソースがある場合は統合して分析
-- 重要なポイントを箇条書きで整理
-- 数値は適切にフォーマット（カンマ区切りなど）
-- ユーザーの質問に直接答える形式で`
+- 個別レコードの詳細な値の羅列は不要
+- 複数のデータソースがある場合は横断的に分析する`
 
 	if schemaInfo != "" {
 		systemPrompt += "\n\n" + schemaInfo
