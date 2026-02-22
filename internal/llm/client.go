@@ -53,7 +53,7 @@ func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (
 }
 
 // AnalyzeResults はクエリ結果を分析して要約を生成
-func (c *Client) AnalyzeResults(ctx context.Context, userMessage string, results map[string]string, schemaInfo string) (string, error) {
+func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, schemaInfo string) (string, error) {
 	systemPrompt := `あなたはエラー調査アシスタントです。
 クエリ結果をもとに、エラーや異常の有無を調査し、簡潔に報告してください。
 
@@ -75,7 +75,6 @@ func (c *Client) AnalyzeResults(ctx context.Context, userMessage string, results
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("質問: %s\n\n", userMessage))
 	sb.WriteString("クエリ結果:\n")
 	for name, result := range results {
 		sb.WriteString(fmt.Sprintf("\n【%s】\n%s\n", name, result))

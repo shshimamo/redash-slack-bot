@@ -20,16 +20,14 @@ import (
 
 // pendingRequest はユーザーの選択待ち状態を保持
 type pendingRequest struct {
-	Channel     string
-	ThreadTS    string
-	UserMessage string
+	Channel  string
+	ThreadTS string
 }
 
 // modalPrivateMetadata はモーダルの private_metadata に格納するデータ
 type modalPrivateMetadata struct {
 	Channel           string `json:"channel"`
 	ThreadTS          string `json:"thread_ts"`
-	UserMessage       string `json:"user_message"`
 	InvestigationName string `json:"investigation_name"`
 }
 
@@ -155,9 +153,8 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 	// pendingRequests に保存
 	h.mu.Lock()
 	h.pendingRequests[requestID] = pendingRequest{
-		Channel:     channel,
-		ThreadTS:    threadTS,
-		UserMessage: cleanText,
+		Channel:  channel,
+		ThreadTS: threadTS,
 	}
 	h.mu.Unlock()
 
@@ -233,7 +230,7 @@ func (h *Handler) handleBlockActions(ctx context.Context, callback slack.Interac
 
 	if len(investigation.Parameters) == 0 {
 		// パラメータなし → 直接実行
-		h.executeInvestigation(ctx, req.Channel, req.ThreadTS, req.UserMessage, investigationName, nil)
+		h.executeInvestigation(ctx, req.Channel, req.ThreadTS, investigationName, nil)
 	} else {
 		// パラメータあり → モーダルを開く
 		h.openParameterModal(callback.TriggerID, investigation, req)
@@ -245,7 +242,6 @@ func (h *Handler) openParameterModal(triggerID string, investigation *config.Inv
 	metadata := modalPrivateMetadata{
 		Channel:           req.Channel,
 		ThreadTS:          req.ThreadTS,
-		UserMessage:       req.UserMessage,
 		InvestigationName: investigation.Name,
 	}
 	metadataJSON, err := json.Marshal(metadata)
@@ -335,12 +331,12 @@ func (h *Handler) handleViewSubmission(ctx context.Context, callback slack.Inter
 		}
 	}
 
-	h.executeInvestigation(ctx, metadata.Channel, metadata.ThreadTS, metadata.UserMessage, metadata.InvestigationName, parameters)
+	h.executeInvestigation(ctx, metadata.Channel, metadata.ThreadTS, metadata.InvestigationName, parameters)
 }
 
 
 // executeInvestigation は調査を実行
-func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, userMessage, investigationName string, parameters map[string]interface{}) {
+func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, investigationName string, parameters map[string]interface{}) {
 	investigation := h.config.GetInvestigationByName(investigationName)
 	if investigation == nil {
 		log.Printf("Investigation not found: %s", investigationName)
@@ -429,7 +425,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, u
 
 	// 結果を分析
 	schemaInfo := h.config.FormatInvestigationSchemas(investigation)
-	analysis, err := h.llmClient.AnalyzeResults(ctx, userMessage, results, schemaInfo)
+	analysis, err := h.llmClient.AnalyzeResults(ctx, results, schemaInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
 		var sb strings.Builder
