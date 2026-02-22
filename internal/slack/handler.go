@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -16,13 +18,30 @@ import (
 	"github.com/shshimamo/redash-slack-bot/internal/redash"
 )
 
+// pendingRequest はユーザーの選択待ち状態を保持
+type pendingRequest struct {
+	Channel     string
+	ThreadTS    string
+	UserMessage string
+}
+
+// modalPrivateMetadata はモーダルの private_metadata に格納するデータ
+type modalPrivateMetadata struct {
+	Channel           string `json:"channel"`
+	ThreadTS          string `json:"thread_ts"`
+	UserMessage       string `json:"user_message"`
+	InvestigationName string `json:"investigation_name"`
+}
+
 // Handler は Slack イベントを処理するハンドラ
 type Handler struct {
-	slackClient  *slack.Client
-	socketClient *socketmode.Client
-	llmClient    *llm.Client
-	redashClient *redash.Client
-	config       *config.Config
+	slackClient     *slack.Client
+	socketClient    *socketmode.Client
+	llmClient       *llm.Client
+	redashClient    *redash.Client
+	config          *config.Config
+	pendingRequests map[string]pendingRequest
+	mu              sync.Mutex
 }
 
 // NewHandler は新しいハンドラを作成
@@ -40,11 +59,12 @@ func NewHandler(
 	socketClient := socketmode.New(slackClient)
 
 	return &Handler{
-		slackClient:  slackClient,
-		socketClient: socketClient,
-		llmClient:    llmClient,
-		redashClient: redashClient,
-		config:       cfg,
+		slackClient:     slackClient,
+		socketClient:    socketClient,
+		llmClient:       llmClient,
+		redashClient:    redashClient,
+		config:          cfg,
+		pendingRequests: make(map[string]pendingRequest),
 	}
 }
 
@@ -69,6 +89,19 @@ func (h *Handler) handleEvents(ctx context.Context) {
 				}
 				h.socketClient.Ack(*evt.Request)
 				h.handleEventsAPI(ctx, eventsAPIEvent)
+
+			case socketmode.EventTypeInteractive:
+				callback, ok := evt.Data.(slack.InteractionCallback)
+				if !ok {
+					continue
+				}
+				h.socketClient.Ack(*evt.Request)
+				switch callback.Type {
+				case slack.InteractionTypeBlockActions:
+					go h.handleBlockActions(ctx, callback)
+				case slack.InteractionTypeViewSubmission:
+					go h.handleViewSubmission(ctx, callback)
+				}
 
 			case socketmode.EventTypeConnecting:
 				log.Println("Connecting to Slack...")
@@ -97,7 +130,6 @@ func (h *Handler) handleEventsAPI(ctx context.Context, event slackevents.EventsA
 
 // handleAppMention はメンションイベントを処理
 func (h *Handler) handleAppMention(ctx context.Context, ev *slackevents.AppMentionEvent) {
-	// スレッド内ならそのスレッドに、そうでなければ元メッセージをスレッド親にする
 	threadTS := ev.ThreadTimeStamp
 	if threadTS == "" {
 		threadTS = ev.TimeStamp
@@ -105,7 +137,7 @@ func (h *Handler) handleAppMention(ctx context.Context, ev *slackevents.AppMenti
 	h.processMessage(ctx, ev.Channel, ev.User, ev.Text, threadTS)
 }
 
-// processMessage はメッセージを処理して応答を返す
+// processMessage はメッセージを処理して調査選択UIを返す
 func (h *Handler) processMessage(ctx context.Context, channel, user, text, threadTS string) {
 	// メンションを除去
 	cleanText := strings.TrimSpace(text)
@@ -117,36 +149,205 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 
 	log.Printf("Processing message from user %s: %s", user, cleanText)
 
-	// 調査選択
-	queriesInfo := h.config.FormatQueriesForLLM()
-	schemaInfo := h.config.FormatSchemaForLLM()
+	// requestID は channel + threadTS で一意に識別
+	requestID := fmt.Sprintf("%s_%s", channel, threadTS)
 
-	selection, err := h.llmClient.SelectQuery(ctx, cleanText, queriesInfo, schemaInfo)
+	// pendingRequests に保存
+	h.mu.Lock()
+	h.pendingRequests[requestID] = pendingRequest{
+		Channel:     channel,
+		ThreadTS:    threadTS,
+		UserMessage: cleanText,
+	}
+	h.mu.Unlock()
+
+	// 30分後にクリーンアップ
+	time.AfterFunc(30*time.Minute, func() {
+		h.mu.Lock()
+		delete(h.pendingRequests, requestID)
+		h.mu.Unlock()
+	})
+
+	// 調査選択のセレクトボックスを投稿
+	options := make([]*slack.OptionBlockObject, 0, len(h.config.Investigations))
+	for _, inv := range h.config.Investigations {
+		options = append(options, &slack.OptionBlockObject{
+			Text:  &slack.TextBlockObject{Type: slack.PlainTextType, Text: inv.Name},
+			Value: inv.Name,
+		})
+	}
+
+	selectElement := &slack.SelectBlockElement{
+		Type:        slack.OptTypeStatic,
+		Placeholder: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "調査を選択してください"},
+		ActionID:    "select_investigation",
+		Options:     options,
+	}
+
+	blocks := []slack.Block{
+		slack.NewSectionBlock(
+			&slack.TextBlockObject{Type: slack.MarkdownType, Text: "どの調査を実行しますか？"},
+			nil, nil,
+		),
+		slack.NewActionBlock(requestID, selectElement),
+	}
+
+	_, _, err := h.slackClient.PostMessage(
+		channel,
+		slack.MsgOptionBlocks(blocks...),
+		slack.MsgOptionTS(threadTS),
+	)
 	if err != nil {
-		log.Printf("Error selecting investigation: %v", err)
-		h.sendMessage(channel, threadTS, "申し訳ありません。リクエストの処理中にエラーが発生しました。")
+		log.Printf("Error posting select message: %v", err)
+	}
+}
+
+// handleBlockActions はブロックアクションを処理
+func (h *Handler) handleBlockActions(ctx context.Context, callback slack.InteractionCallback) {
+	if len(callback.ActionCallback.BlockActions) == 0 {
 		return
 	}
 
-	if !selection.CanHandle {
-		h.sendMessage(channel, threadTS, selection.Message)
+	action := callback.ActionCallback.BlockActions[0]
+	if action.ActionID != "select_investigation" {
 		return
 	}
 
-	// 調査を実行
-	h.executeInvestigation(ctx, channel, threadTS, cleanText, selection)
+	requestID := action.BlockID
+	investigationName := action.SelectedOption.Value
+
+	h.mu.Lock()
+	req, ok := h.pendingRequests[requestID]
+	h.mu.Unlock()
+
+	if !ok {
+		log.Printf("Pending request not found for requestID: %s", requestID)
+		return
+	}
+
+	investigation := h.config.GetInvestigationByName(investigationName)
+	if investigation == nil {
+		log.Printf("Investigation not found: %s", investigationName)
+		return
+	}
+
+	if len(investigation.Parameters) == 0 {
+		// パラメータなし → 直接実行
+		h.executeInvestigation(ctx, req.Channel, req.ThreadTS, req.UserMessage, investigationName, nil)
+	} else {
+		// パラメータあり → モーダルを開く
+		h.openParameterModal(callback.TriggerID, investigation, req)
+	}
+}
+
+// openParameterModal はパラメータ入力モーダルを開く
+func (h *Handler) openParameterModal(triggerID string, investigation *config.InvestigationConfig, req pendingRequest) {
+	metadata := modalPrivateMetadata{
+		Channel:           req.Channel,
+		ThreadTS:          req.ThreadTS,
+		UserMessage:       req.UserMessage,
+		InvestigationName: investigation.Name,
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		log.Printf("Error marshaling modal metadata: %v", err)
+		return
+	}
+
+	var inputBlocks []slack.Block
+	for _, param := range investigation.Parameters {
+		label := param.Description
+		if label == "" {
+			label = param.Name
+		}
+
+		var element slack.BlockElement
+		if param.Type == "date" {
+			element = &slack.DatePickerBlockElement{
+				Type:     slack.METDatepicker,
+				ActionID: param.Name,
+			}
+		} else {
+			element = &slack.PlainTextInputBlockElement{
+				Type:     slack.METPlainTextInput,
+				ActionID: param.Name,
+			}
+		}
+
+		inputBlock := &slack.InputBlock{
+			Type:    slack.MBTInput,
+			BlockID: param.Name,
+			Label:   &slack.TextBlockObject{Type: slack.PlainTextType, Text: label},
+			Element: element,
+		}
+		inputBlocks = append(inputBlocks, inputBlock)
+	}
+
+	modal := slack.ModalViewRequest{
+		Type:            slack.VTModal,
+		Title:           &slack.TextBlockObject{Type: slack.PlainTextType, Text: investigation.Name},
+		Submit:          &slack.TextBlockObject{Type: slack.PlainTextType, Text: "実行"},
+		Close:           &slack.TextBlockObject{Type: slack.PlainTextType, Text: "キャンセル"},
+		CallbackID:      "parameter_input",
+		PrivateMetadata: string(metadataJSON),
+		Blocks:          slack.Blocks{BlockSet: inputBlocks},
+	}
+
+	_, err = h.slackClient.OpenView(triggerID, modal)
+	if err != nil {
+		log.Printf("Error opening modal: %v", err)
+	}
+}
+
+// handleViewSubmission はモーダルの送信を処理
+func (h *Handler) handleViewSubmission(ctx context.Context, callback slack.InteractionCallback) {
+	if callback.View.CallbackID != "parameter_input" {
+		return
+	}
+
+	var metadata modalPrivateMetadata
+	if err := json.Unmarshal([]byte(callback.View.PrivateMetadata), &metadata); err != nil {
+		log.Printf("Error parsing modal metadata: %v", err)
+		return
+	}
+
+	investigation := h.config.GetInvestigationByName(metadata.InvestigationName)
+	if investigation == nil {
+		log.Printf("Investigation not found: %s", metadata.InvestigationName)
+		return
+	}
+
+	// パラメータ値を取得
+	parameters := make(map[string]interface{})
+	for _, param := range investigation.Parameters {
+		blockValues, ok := callback.View.State.Values[param.Name]
+		if !ok {
+			continue
+		}
+		actionValue, ok := blockValues[param.Name]
+		if !ok {
+			continue
+		}
+		if param.Type == "date" {
+			parameters[param.Name] = actionValue.SelectedDate
+		} else {
+			parameters[param.Name] = actionValue.Value
+		}
+	}
+
+	h.executeInvestigation(ctx, metadata.Channel, metadata.ThreadTS, metadata.UserMessage, metadata.InvestigationName, parameters)
 }
 
 // executeInvestigation は調査を実行
-func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, userMessage string, selection *llm.SelectionResult) {
-	investigation := h.config.GetInvestigationByName(selection.InvestigationName)
+func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, userMessage, investigationName string, parameters map[string]interface{}) {
+	investigation := h.config.GetInvestigationByName(investigationName)
 	if investigation == nil {
-		log.Printf("Investigation not found: %s", selection.InvestigationName)
-		h.sendMessage(channel, threadTS, fmt.Sprintf("調査「%s」が見つかりませんでした。", selection.InvestigationName))
+		log.Printf("Investigation not found: %s", investigationName)
+		h.sendMessage(channel, threadTS, fmt.Sprintf("調査「%s」が見つかりませんでした。", investigationName))
 		return
 	}
 
-	log.Printf("Executing investigation: %s with parameters: %v", investigation.Name, selection.Parameters)
+	log.Printf("Executing investigation: %s with parameters: %v", investigation.Name, parameters)
 
 	// 複数クエリの場合は進行状況を通知
 	if len(investigation.Queries) > 1 {
@@ -158,7 +359,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, u
 	for _, query := range investigation.Queries {
 		log.Printf("Executing query: %s (ID: %d)", query.Name, query.ID)
 
-		result, err := h.redashClient.ExecuteQuery(query.ID, selection.Parameters)
+		result, err := h.redashClient.ExecuteQuery(query.ID, parameters)
 		if err != nil {
 			log.Printf("Error executing query %d: %v", query.ID, err)
 			results[query.Name] = fmt.Sprintf("エラー: %v", err)
@@ -179,7 +380,6 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, u
 	analysis, err := h.llmClient.AnalyzeResults(ctx, userMessage, results)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
-		// 分析に失敗した場合は生のデータを返す
 		var sb strings.Builder
 		sb.WriteString("クエリ結果:\n")
 		for name, result := range results {
