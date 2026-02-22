@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 )
 
 // executeInvestigation は調査を実行
@@ -64,39 +65,68 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		}
 	}
 
-	// 複数クエリの場合は進行状況を通知
-	if len(investigation.Queries) > 1 {
-		h.sendMessage(channel, threadTS, fmt.Sprintf("「%s」を実行中... (%d件のクエリ)", investigation.Name, len(investigation.Queries)))
+	// 実行対象クエリを絞り込む（未解決パラメータがあるクエリはスキップ）
+	var runnableQueries []struct {
+		name        string
+		id          int
+		queryParams map[string]interface{}
 	}
-
-	// 各クエリを実行（未解決パラメータがあるクエリはスキップ）
-	results := make(map[string]string)
 	for _, query := range investigation.Queries {
 		if missing := missingParams(query.RequiredParameters, params); len(missing) > 0 {
 			log.Printf("Skipping query %q (ID: %d): unresolved parameters: %v", query.Name, query.ID, missing)
 			continue
 		}
-
-		log.Printf("Executing query: %s (ID: %d)", query.Name, query.ID)
-
-		// required_parameters で指定されたパラメータのみ渡す
-		queryParams := filterParams(query.RequiredParameters, params)
-		result, err := redashClient.ExecuteQuery(query.ID, queryParams)
-		if err != nil {
-			log.Printf("Error executing query %d: %v", query.ID, err)
-			results[query.Name] = fmt.Sprintf("エラー: %v", err)
-			continue
-		}
-
-		resultJSON, err := json.MarshalIndent(result, "", "  ")
-		if err != nil {
-			log.Printf("Error marshaling result for query %d: %v", query.ID, err)
-			results[query.Name] = "結果のシリアライズに失敗"
-			continue
-		}
-
-		results[query.Name] = string(resultJSON)
+		runnableQueries = append(runnableQueries, struct {
+			name        string
+			id          int
+			queryParams map[string]interface{}
+		}{
+			name:        query.Name,
+			id:          query.ID,
+			queryParams: filterParams(query.RequiredParameters, params),
+		})
 	}
+
+	// 複数クエリの場合は進行状況を通知
+	if len(runnableQueries) > 1 {
+		h.sendMessage(channel, threadTS, fmt.Sprintf("「%s」を実行中... (%d件のクエリ)", investigation.Name, len(runnableQueries)))
+	}
+
+	// クエリを並列実行（セマフォで同時実行数を制限）
+	results := make(map[string]string)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, h.queryConcurrency)
+
+	for _, q := range runnableQueries {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(name string, id int, queryParams map[string]interface{}) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			log.Printf("Executing query: %s (ID: %d)", name, id)
+
+			result, err := redashClient.ExecuteQuery(id, queryParams)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				log.Printf("Error executing query %d: %v", id, err)
+				results[name] = fmt.Sprintf("エラー: %v", err)
+				return
+			}
+
+			resultJSON, err := json.MarshalIndent(result, "", "  ")
+			if err != nil {
+				log.Printf("Error marshaling result for query %d: %v", id, err)
+				results[name] = "結果のシリアライズに失敗"
+				return
+			}
+
+			results[name] = string(resultJSON)
+		}(q.name, q.id, q.queryParams)
+	}
+	wg.Wait()
 
 	if len(results) == 0 {
 		h.sendMessage(channel, threadTS, "実行できるクエリがありませんでした。パラメータを確認してください。")

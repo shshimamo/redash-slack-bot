@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/shshimamo/redash-slack-bot/internal/config"
@@ -61,8 +62,19 @@ func main() {
 	}
 	log.Printf("Redash clients initialized (%d instances)", len(redashClients))
 
+	// クエリ並列実行数（デフォルト: 5）
+	queryConcurrency := 5
+	if v := os.Getenv("QUERY_CONCURRENCY"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			log.Fatalf("QUERY_CONCURRENCY must be a positive integer, got: %s", v)
+		}
+		queryConcurrency = n
+	}
+	log.Printf("Query concurrency: %d", queryConcurrency)
+
 	// Slack ハンドラ初期化（Socket Mode）
-	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg)
+	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency)
 
 	// Context with cancel for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

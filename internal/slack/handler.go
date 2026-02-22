@@ -30,13 +30,14 @@ type modalPrivateMetadata struct {
 
 // Handler は Slack イベントを処理するハンドラ
 type Handler struct {
-	slackClient     *slack.Client
-	socketClient    *socketmode.Client
-	llmClient       *llm.Client
-	redashClients   map[string]*redash.Client
-	config          *config.Config
-	pendingRequests map[string]pendingRequest
-	mu              sync.Mutex
+	slackClient        *slack.Client
+	socketClient       *socketmode.Client
+	llmClient          *llm.Client
+	redashClients      map[string]*redash.Client
+	config             *config.Config
+	pendingRequests    map[string]pendingRequest
+	mu                 sync.Mutex
+	queryConcurrency   int
 }
 
 // NewHandler は新しいハンドラを作成
@@ -46,6 +47,7 @@ func NewHandler(
 	llmClient *llm.Client,
 	redashClients map[string]*redash.Client,
 	cfg *config.Config,
+	queryConcurrency int,
 ) *Handler {
 	slackClient := slack.New(
 		botToken,
@@ -54,12 +56,13 @@ func NewHandler(
 	socketClient := socketmode.New(slackClient)
 
 	return &Handler{
-		slackClient:     slackClient,
-		socketClient:    socketClient,
-		llmClient:       llmClient,
-		redashClients:   redashClients,
-		config:          cfg,
-		pendingRequests: make(map[string]pendingRequest),
+		slackClient:      slackClient,
+		socketClient:     socketClient,
+		llmClient:        llmClient,
+		redashClients:    redashClients,
+		config:           cfg,
+		pendingRequests:  make(map[string]pendingRequest),
+		queryConcurrency: queryConcurrency,
 	}
 }
 
