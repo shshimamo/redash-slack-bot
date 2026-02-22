@@ -10,3 +10,14 @@ services:
       - ~/.aws:/home/appuser/.aws:ro
     environment:
       - AWS_PROFILE=${AWS_PROFILE:-default}
+  postgres:
+    image: postgres:15-alpine
+    container_name: redash-slack-bot-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./configs/sample_data.sql:/docker-entrypoint-initdb.d/init.sql
