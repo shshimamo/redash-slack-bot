@@ -73,8 +73,30 @@ func main() {
 	}
 	log.Printf("Query concurrency: %d", queryConcurrency)
 
+	// クエリ結果の最大サイズ（デフォルト: 10000 bytes、0 で無制限）
+	queryResultMaxBytes := 10000
+	if v := os.Getenv("QUERY_RESULT_MAX_BYTES"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			log.Fatalf("QUERY_RESULT_MAX_BYTES must be a non-negative integer, got: %s", v)
+		}
+		queryResultMaxBytes = n
+	}
+	log.Printf("Query result max bytes: %d", queryResultMaxBytes)
+
+	// LLM 入力合計の最大サイズ（デフォルト: 50000 bytes、0 で無制限）
+	llmInputMaxBytes := 50000
+	if v := os.Getenv("LLM_INPUT_MAX_BYTES"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			log.Fatalf("LLM_INPUT_MAX_BYTES must be a non-negative integer, got: %s", v)
+		}
+		llmInputMaxBytes = n
+	}
+	log.Printf("LLM input max bytes: %d", llmInputMaxBytes)
+
 	// Slack ハンドラ初期化（Socket Mode）
-	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency)
+	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency, queryResultMaxBytes, llmInputMaxBytes)
 
 	// Context with cancel for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

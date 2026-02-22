@@ -28,16 +28,21 @@ type modalPrivateMetadata struct {
 	InvestigationName string `json:"investigation_name"`
 }
 
+// slackMessageMaxChars は Slack メッセージの文字数上限
+const slackMessageMaxChars = 3000
+
 // Handler は Slack イベントを処理するハンドラ
 type Handler struct {
-	slackClient        *slack.Client
-	socketClient       *socketmode.Client
-	llmClient          *llm.Client
-	redashClients      map[string]*redash.Client
-	config             *config.Config
-	pendingRequests    map[string]pendingRequest
-	mu                 sync.Mutex
-	queryConcurrency   int
+	slackClient         *slack.Client
+	socketClient        *socketmode.Client
+	llmClient           *llm.Client
+	redashClients       map[string]*redash.Client
+	config              *config.Config
+	pendingRequests     map[string]pendingRequest
+	mu                  sync.Mutex
+	queryConcurrency    int
+	queryResultMaxBytes int
+	llmInputMaxBytes    int
 }
 
 // NewHandler は新しいハンドラを作成
@@ -48,6 +53,8 @@ func NewHandler(
 	redashClients map[string]*redash.Client,
 	cfg *config.Config,
 	queryConcurrency int,
+	queryResultMaxBytes int,
+	llmInputMaxBytes int,
 ) *Handler {
 	slackClient := slack.New(
 		botToken,
@@ -56,13 +63,15 @@ func NewHandler(
 	socketClient := socketmode.New(slackClient)
 
 	return &Handler{
-		slackClient:      slackClient,
-		socketClient:     socketClient,
-		llmClient:        llmClient,
-		redashClients:    redashClients,
-		config:           cfg,
-		pendingRequests:  make(map[string]pendingRequest),
-		queryConcurrency: queryConcurrency,
+		slackClient:         slackClient,
+		socketClient:        socketClient,
+		llmClient:           llmClient,
+		redashClients:       redashClients,
+		config:              cfg,
+		pendingRequests:     make(map[string]pendingRequest),
+		queryConcurrency:    queryConcurrency,
+		queryResultMaxBytes: queryResultMaxBytes,
+		llmInputMaxBytes:    llmInputMaxBytes,
 	}
 }
 
@@ -151,6 +160,12 @@ func (h *Handler) handleAppMention(ctx context.Context, ev *slackevents.AppMenti
 
 // sendMessage は Slack にメッセージを送信
 func (h *Handler) sendMessage(channel, threadTS, text string) {
+	// Slack のテキスト上限を超える場合はトランケート
+	runes := []rune(text)
+	if len(runes) > slackMessageMaxChars {
+		text = string(runes[:slackMessageMaxChars-14]) + "\n... (truncated)"
+	}
+
 	opts := []slack.MsgOption{
 		slack.MsgOptionText(text, false),
 	}

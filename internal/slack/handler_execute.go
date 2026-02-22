@@ -26,6 +26,12 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 
 	log.Printf("Executing investigation: %s with parameters: %v", investigation.Name, params)
 
+	// クエリ結果サイズ上限: investigation 指定 → デフォルトの順で適用
+	maxBytes := h.queryResultMaxBytes
+	if investigation.QueryResultMaxBytes != nil {
+		maxBytes = *investigation.QueryResultMaxBytes
+	}
+
 	redashClient, err := h.redashClientFor(investigation)
 	if err != nil {
 		log.Printf("Error: %v", err)
@@ -123,6 +129,12 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 				return
 			}
 
+			// クエリ結果が上限を超える場合はエラー
+			if maxBytes > 0 && len(resultJSON) > maxBytes {
+				log.Printf("Query result for %q exceeds limit: %d > %d bytes", name, len(resultJSON), maxBytes)
+				results[name] = fmt.Sprintf("エラー: クエリ結果が上限 (%d bytes) を超えています (実際: %d bytes)", maxBytes, len(resultJSON))
+				return
+			}
 			results[name] = string(resultJSON)
 		}(q.name, q.id, q.queryParams)
 	}
@@ -136,6 +148,24 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	// 結果を分析
 	systemPrompt := h.config.GetInvestigationPrompt(investigation)
 	schemaInfo := h.config.FormatInvestigationSchemas(investigation)
+
+	// LLM 入力合計サイズチェック: investigation 指定 → デフォルトの順で適用
+	maxLLMInput := h.llmInputMaxBytes
+	if investigation.LLMInputMaxBytes != nil {
+		maxLLMInput = *investigation.LLMInputMaxBytes
+	}
+	if maxLLMInput > 0 {
+		total := len(systemPrompt) + len(schemaInfo)
+		for _, r := range results {
+			total += len(r)
+		}
+		if total > maxLLMInput {
+			log.Printf("LLM input for %q exceeds limit: %d > %d bytes", investigation.Name, total, maxLLMInput)
+			h.sendMessage(channel, threadTS, fmt.Sprintf("エラー: LLM への入力合計が上限 (%d bytes) を超えています (実際: %d bytes)", maxLLMInput, total))
+			return
+		}
+	}
+
 	analysis, err := h.llmClient.AnalyzeResults(ctx, results, systemPrompt, schemaInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)

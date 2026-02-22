@@ -26,14 +26,16 @@ type Config struct {
 
 // InvestigationConfig は調査の定義（1件でも複数クエリでも同じ形式）
 type InvestigationConfig struct {
-	Name              string                   `yaml:"name"`
-	Description       string                   `yaml:"description"`
-	Prompt            string                   `yaml:"prompt"`
-	RedashInstance    string                   `yaml:"redash_instance"`
-	Parameters        []ParameterConfig        `yaml:"parameters"`
-	ResolveParameters []ResolveParameterConfig `yaml:"resolve_parameters"`
-	Queries           []QueryConfig            `yaml:"queries"`
-	Schemas           []string                 `yaml:"schemas"`
+	Name                string                   `yaml:"name"`
+	Description         string                   `yaml:"description"`
+	Prompt              string                   `yaml:"prompt"`
+	RedashInstance      string                   `yaml:"redash_instance"`
+	QueryResultMaxBytes *int                     `yaml:"query_result_max_bytes"`
+	LLMInputMaxBytes    *int                     `yaml:"llm_input_max_bytes"`
+	Parameters          []ParameterConfig        `yaml:"parameters"`
+	ResolveParameters   []ResolveParameterConfig `yaml:"resolve_parameters"`
+	Queries             []QueryConfig            `yaml:"queries"`
+	Schemas             []string                 `yaml:"schemas"`
 }
 
 // ResolveParameterConfig はパラメータ解決クエリの定義
