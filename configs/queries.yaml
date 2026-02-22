@@ -10,15 +10,18 @@ investigations:
       - id: 1
         name: "決済情報"
         description: "基本的な決済情報を取得"
-        sql: "SELECT * FROM payments WHERE request_id = {{request_id}}"
+        required_parameters:
+          - request_id
       - id: 2
         name: "決済ログ"
         description: "決済処理のログを取得"
-        sql: "SELECT * FROM payment_logs WHERE request_id = {{request_id}} ORDER BY created_at"
+        required_parameters:
+          - request_id
       - id: 3
         name: "エラー情報"
         description: "関連するエラー情報を取得"
-        sql: "SELECT * FROM payment_errors WHERE request_id = {{request_id}}"
+        required_parameters:
+          - request_id
 
   - name: "決済ステータス集計"
     description: "期間内の決済ステータスごとの件数と金額を集計"
@@ -33,7 +36,9 @@ investigations:
       - id: 4
         name: "ステータス集計"
         description: "決済ステータスごとの件数と金額"
-        sql: "SELECT status, COUNT(*) as count, SUM(amount) as total_amount FROM payments WHERE created_at BETWEEN {{start_date}} AND {{end_date}} GROUP BY status"
+        required_parameters:
+          - start_date
+          - end_date
 
   - name: "システムステータス確認"
     description: "システムの稼働状況を確認（パラメータ不要）"
@@ -41,4 +46,29 @@ investigations:
       - id: 5
         name: "システムステータス"
         description: "最新のシステムステータス"
-        sql: "SELECT * FROM system_status ORDER BY checked_at DESC LIMIT 1"
+
+  - name: "決済詳細調査"
+    description: "request_id から payment_id と user_id を自動解決し、決済詳細とユーザー情報を取得"
+    parameters:
+      - name: request_id
+        type: string
+        description: "リクエストID"
+    resolve_parameters:
+      - name: "payment_id と user_id を解決"
+        query_id: 6
+        outputs:
+          - name: payment_id
+            field: payment_id
+          - name: user_id
+            field: user_id
+    queries:
+      - id: 7
+        name: "決済詳細"
+        description: "ゲートウェイの処理結果など詳細情報"
+        required_parameters:
+          - payment_id
+      - id: 8
+        name: "ユーザー情報"
+        description: "決済者のユーザー情報"
+        required_parameters:
+          - user_id

@@ -34,10 +34,11 @@ type QueryExecuteResponse struct {
 }
 
 type QueryJob struct {
-	ID          string       `json:"id"`
-	Status      int          `json:"status"` // 1: pending, 2: started, 3: success, 4: failure
-	Error       string       `json:"error,omitempty"`
-	QueryResult *QueryResult `json:"query_result,omitempty"`
+	ID            string       `json:"id"`
+	Status        int          `json:"status"` // 1: pending, 2: started, 3: success, 4: failure
+	Error         string       `json:"error,omitempty"`
+	QueryResult   *QueryResult `json:"query_result,omitempty"`
+	QueryResultID int          `json:"query_result_id,omitempty"`
 }
 
 type QueryResult struct {
@@ -118,6 +119,32 @@ func (c *Client) ExecuteQuery(queryID int, parameters map[string]interface{}) (*
 	return &data, nil
 }
 
+// fetchQueryResult は query_result_id から結果データを取得
+func (c *Client) fetchQueryResult(queryResultID int) (json.RawMessage, error) {
+	url := fmt.Sprintf("%s/api/query_results/%d", c.BaseURL, queryResultID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create query result request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Key %s", c.APIKey))
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get query result: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		QueryResult QueryResult `json:"query_result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode query result: %w", err)
+	}
+
+	return result.QueryResult.Data, nil
+}
+
 // waitForJob はジョブの完了を待機
 func (c *Client) waitForJob(jobID string) (json.RawMessage, error) {
 	url := fmt.Sprintf("%s/api/jobs/%s", c.BaseURL, jobID)
@@ -150,6 +177,9 @@ func (c *Client) waitForJob(jobID string) (json.RawMessage, error) {
 		case 3: // Success
 			if jobResp.Job.QueryResult != nil {
 				return jobResp.Job.QueryResult.Data, nil
+			}
+			if jobResp.Job.QueryResultID != 0 {
+				return c.fetchQueryResult(jobResp.Job.QueryResultID)
 			}
 			return nil, fmt.Errorf("query succeeded but no result data")
 		case 4: // Failure

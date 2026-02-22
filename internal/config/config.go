@@ -17,18 +17,32 @@ type Config struct {
 
 // InvestigationConfig は調査の定義（1件でも複数クエリでも同じ形式）
 type InvestigationConfig struct {
-	Name        string            `yaml:"name"`
-	Description string            `yaml:"description"`
-	Parameters  []ParameterConfig `yaml:"parameters"`
-	Queries     []QueryConfig     `yaml:"queries"`
+	Name              string                   `yaml:"name"`
+	Description       string                   `yaml:"description"`
+	Parameters        []ParameterConfig        `yaml:"parameters"`
+	ResolveParameters []ResolveParameterConfig `yaml:"resolve_parameters"`
+	Queries           []QueryConfig            `yaml:"queries"`
+}
+
+// ResolveParameterConfig はパラメータ解決クエリの定義
+type ResolveParameterConfig struct {
+	Name    string                `yaml:"name"`
+	QueryID int                   `yaml:"query_id"`
+	Outputs []ResolveOutputConfig `yaml:"outputs"`
+}
+
+// ResolveOutputConfig はクエリ結果からパラメータへのマッピング
+type ResolveOutputConfig struct {
+	Name  string `yaml:"name"`  // 解決後のパラメータ名
+	Field string `yaml:"field"` // クエリ結果の列名
 }
 
 // QueryConfig は Redash クエリの定義
 type QueryConfig struct {
-	ID          int    `yaml:"id"`
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	SQL         string `yaml:"sql"`
+	ID                   int      `yaml:"id"`
+	Name                 string   `yaml:"name"`
+	Description          string   `yaml:"description"`
+	RequiredParameters   []string `yaml:"required_parameters"`
 }
 
 // ParameterConfig はクエリパラメータの定義
