@@ -23,6 +23,7 @@ func main() {
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
 	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
 	promptsDir := getEnv("PROMPTS_DIR", "configs/prompts")
+	documentsDir := getEnv("DOCUMENTS_DIR", "configs/documents")
 
 	// 設定ファイル読み込み
 	cfg, err := config.LoadConfig(configPath)
@@ -44,6 +45,11 @@ func main() {
 	// investigation ごとのプロンプトファイル読み込み
 	if err := cfg.LoadInvestigationPrompts(promptsDir); err != nil {
 		log.Printf("Warning: Failed to load investigation prompts: %v", err)
+	}
+
+	// investigation ごとのドキュメントファイル読み込み
+	if err := cfg.LoadInvestigationDocuments(documentsDir); err != nil {
+		log.Printf("Warning: Failed to load investigation documents: %v", err)
 	}
 
 	// Anthropic クライアント初期化

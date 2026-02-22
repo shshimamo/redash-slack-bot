@@ -22,6 +22,7 @@ type Config struct {
 	Investigations  []InvestigationConfig  `yaml:"investigations"`
 	schemaCache     map[string]string
 	promptCache     map[string]string
+	documentCache   map[string]string
 }
 
 // InvestigationConfig は調査の定義（1件でも複数クエリでも同じ形式）
@@ -37,6 +38,7 @@ type InvestigationConfig struct {
 	ResolveParameters   []ResolveParameterConfig `yaml:"resolve_parameters"`
 	Queries             []QueryConfig            `yaml:"queries"`
 	Schemas             []string                 `yaml:"schemas"`
+	Documents           []string                 `yaml:"documents"`
 }
 
 // ResolveParameterConfig はパラメータ解決クエリの定義
@@ -154,6 +156,50 @@ func (c *Config) FormatInvestigationSchemas(inv *InvestigationConfig) string {
 	var sb strings.Builder
 	for _, schemaFile := range inv.Schemas {
 		content, ok := c.schemaCache[schemaFile]
+		if !ok {
+			continue
+		}
+		sb.WriteString(content)
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+// LoadInvestigationDocuments は configs/documents/ 配下のドキュメントファイルを読み込む
+func (c *Config) LoadInvestigationDocuments(documentsDir string) error {
+	c.documentCache = make(map[string]string)
+
+	// 全 investigation が参照するドキュメントファイルを収集
+	seen := make(map[string]bool)
+	for _, inv := range c.Investigations {
+		for _, docFile := range inv.Documents {
+			seen[docFile] = true
+		}
+	}
+
+	// 各ドキュメントファイルを読み込む
+	for docFile := range seen {
+		path := filepath.Join(documentsDir, docFile)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read document file %s: %w", docFile, err)
+		}
+		c.documentCache[docFile] = string(data)
+		fmt.Printf("Loaded document: %s\n", docFile)
+	}
+
+	return nil
+}
+
+// FormatInvestigationDocuments は investigation のドキュメント情報を LLM 向けにフォーマット
+func (c *Config) FormatInvestigationDocuments(inv *InvestigationConfig) string {
+	if len(inv.Documents) == 0 || c.documentCache == nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	for _, docFile := range inv.Documents {
+		content, ok := c.documentCache[docFile]
 		if !ok {
 			continue
 		}

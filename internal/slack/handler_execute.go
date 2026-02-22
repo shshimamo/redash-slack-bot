@@ -170,6 +170,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	// 結果を分析
 	systemPrompt := h.config.GetInvestigationPrompt(investigation)
 	schemaInfo := h.config.FormatInvestigationSchemas(investigation)
+	documentInfo := h.config.FormatInvestigationDocuments(investigation)
 
 	// LLM 入力合計サイズチェック: investigation 指定 → デフォルトの順で適用
 	maxLLMInput := h.llmInputMaxBytes
@@ -177,7 +178,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		maxLLMInput = *investigation.LLMInputMaxBytes
 	}
 	if maxLLMInput > 0 {
-		total := len(systemPrompt) + len(schemaInfo)
+		total := len(systemPrompt) + len(schemaInfo) + len(documentInfo)
 		for _, r := range results {
 			total += len(r)
 		}
@@ -189,7 +190,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	}
 
 	log.Printf("Analyzing results for investigation %q (%d queries)", investigation.Name, len(results))
-	analysis, err := h.llmClient.AnalyzeResults(ctx, results, systemPrompt, schemaInfo)
+	analysis, err := h.llmClient.AnalyzeResults(ctx, results, systemPrompt, schemaInfo, documentInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
 		var sb strings.Builder

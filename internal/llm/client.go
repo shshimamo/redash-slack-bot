@@ -53,9 +53,12 @@ func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (
 }
 
 // AnalyzeResults はクエリ結果を分析して要約を生成
-func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, systemPrompt, schemaInfo string) (string, error) {
+func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, systemPrompt, schemaInfo, documentInfo string) (string, error) {
 	if schemaInfo != "" {
 		systemPrompt += "\n\n" + schemaInfo
+	}
+	if documentInfo != "" {
+		systemPrompt += "\n\n" + documentInfo
 	}
 
 	var sb strings.Builder
