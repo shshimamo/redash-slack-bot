@@ -17,6 +17,8 @@ investigations:
     redash_instance: "default"
     timeout: "120s"
     query_result_max_bytes: 10000
+    allowed_groups:
+      - payment-team
     schemas:
       - test_db.json
     parameters:
@@ -46,6 +48,8 @@ investigations:
     redash_instance: "default"
     timeout: "120s"
     query_result_max_bytes: 10000
+    allowed_groups:
+      - payment-team
     schemas:
       - test_db.json
     parameters:
@@ -69,6 +73,8 @@ investigations:
     redash_instance: "default"
     timeout: "120s"
     query_result_max_bytes: 10000
+    allowed_groups:
+      - payment-team
     queries:
       - id: 5
         name: "システムステータス"

@@ -18,14 +18,15 @@ import (
 
 // pendingRequest はユーザーの選択待ち状態を保持
 type pendingRequest struct {
-	Channel  string
-	ThreadTS string
+	Channel         string
+	ThreadTimestamp        string
+	SelectMessageTimestamp string // セレクトボックスのメッセージ TS（選択後に上書きするため）
 }
 
 // modalPrivateMetadata はモーダルの private_metadata に格納するデータ
 type modalPrivateMetadata struct {
 	Channel           string `json:"channel"`
-	ThreadTS          string `json:"thread_ts"`
+	ThreadTimestamp          string `json:"thread_ts"`
 	InvestigationName string `json:"investigation_name"`
 }
 
@@ -161,15 +162,15 @@ func (h *Handler) handleEventsAPI(ctx context.Context, event slackevents.EventsA
 
 // handleAppMention はメンションイベントを処理
 func (h *Handler) handleAppMention(ctx context.Context, ev *slackevents.AppMentionEvent) {
-	threadTS := ev.ThreadTimeStamp
-	if threadTS == "" {
-		threadTS = ev.TimeStamp
+	threadTimestamp := ev.ThreadTimeStamp
+	if threadTimestamp == "" {
+		threadTimestamp = ev.TimeStamp
 	}
-	h.processMessage(ctx, ev.Channel, ev.User, ev.Text, threadTS)
+	h.processMessage(ctx, ev.Channel, ev.User, ev.Text, threadTimestamp)
 }
 
 // sendMessage は Slack にメッセージを送信
-func (h *Handler) sendMessage(channel, threadTS, text string) {
+func (h *Handler) sendMessage(channel, threadTimestamp, text string) {
 	// Slack のテキスト上限を超える場合はトランケート
 	runes := []rune(text)
 	if len(runes) > slackMessageMaxChars {
@@ -179,8 +180,8 @@ func (h *Handler) sendMessage(channel, threadTS, text string) {
 	opts := []slack.MsgOption{
 		slack.MsgOptionText(text, false),
 	}
-	if threadTS != "" {
-		opts = append(opts, slack.MsgOptionTS(threadTS))
+	if threadTimestamp != "" {
+		opts = append(opts, slack.MsgOptionTS(threadTimestamp))
 	}
 
 	_, _, err := h.slackClient.PostMessage(channel, opts...)

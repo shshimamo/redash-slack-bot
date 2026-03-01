@@ -11,11 +11,11 @@ import (
 )
 
 // executeInvestigation は調査を実行
-func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, investigationName string, parameters map[string]interface{}) {
+func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTimestamp, investigationName string, parameters map[string]interface{}) {
 	investigation := h.config.GetInvestigationByName(investigationName)
 	if investigation == nil {
 		log.Printf("Investigation not found: %s", investigationName)
-		h.sendMessage(channel, threadTS, fmt.Sprintf("調査「%s」が見つかりませんでした。", investigationName))
+		h.sendMessage(channel, threadTimestamp, fmt.Sprintf("調査「%s」が見つかりませんでした。", investigationName))
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	redashClient, err := h.redashClientFor(investigation)
 	if err != nil {
 		log.Printf("Error: %v", err)
-		h.sendMessage(channel, threadTS, fmt.Sprintf("設定エラー: %v", err))
+		h.sendMessage(channel, threadTimestamp, fmt.Sprintf("設定エラー: %v", err))
 		return
 	}
 
@@ -109,7 +109,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 
 	// 複数クエリの場合は進行状況を通知
 	if len(runnableQueries) > 1 {
-		h.sendMessage(channel, threadTS, fmt.Sprintf("「%s」を実行中... (%d件のクエリ)", investigation.Name, len(runnableQueries)))
+		h.sendMessage(channel, threadTimestamp, fmt.Sprintf("「%s」を実行中... (%d件のクエリ)", investigation.Name, len(runnableQueries)))
 	}
 
 	// クエリを並列実行（セマフォで同時実行数を制限）
@@ -158,12 +158,12 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	// タイムアウトチェック
 	if ctx.Err() != nil {
 		log.Printf("Investigation %q timed out after %s", investigation.Name, timeout)
-		h.sendMessage(channel, threadTS, fmt.Sprintf("タイムアウト: 調査「%s」が %s 以内に完了しませんでした。", investigation.Name, timeout))
+		h.sendMessage(channel, threadTimestamp, fmt.Sprintf("タイムアウト: 調査「%s」が %s 以内に完了しませんでした。", investigation.Name, timeout))
 		return
 	}
 
 	if len(results) == 0 {
-		h.sendMessage(channel, threadTS, "実行できるクエリがありませんでした。パラメータを確認してください。")
+		h.sendMessage(channel, threadTimestamp, "実行できるクエリがありませんでした。パラメータを確認してください。")
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		}
 		if total > maxLLMInput {
 			log.Printf("LLM input for %q exceeds limit: %d > %d bytes", investigation.Name, total, maxLLMInput)
-			h.sendMessage(channel, threadTS, fmt.Sprintf("エラー: LLM への入力合計が上限 (%d bytes) を超えています (実際: %d bytes)", maxLLMInput, total))
+			h.sendMessage(channel, threadTimestamp, fmt.Sprintf("エラー: LLM への入力合計が上限 (%d bytes) を超えています (実際: %d bytes)", maxLLMInput, total))
 			return
 		}
 	}
@@ -198,11 +198,11 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		for name, result := range results {
 			sb.WriteString(fmt.Sprintf("\n【%s】\n```\n%s\n```\n", name, result))
 		}
-		h.sendMessage(channel, threadTS, sb.String())
+		h.sendMessage(channel, threadTimestamp, sb.String())
 		return
 	}
 
-	h.sendMessage(channel, threadTS, analysis)
+	h.sendMessage(channel, threadTimestamp, analysis)
 	log.Printf("Investigation %q completed successfully", investigation.Name)
 }
 

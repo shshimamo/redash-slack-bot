@@ -14,7 +14,7 @@ import (
 )
 
 // processMessage はメッセージを処理して調査選択 UI を返す
-func (h *Handler) processMessage(ctx context.Context, channel, user, text, threadTS string) {
+func (h *Handler) processMessage(ctx context.Context, channel, user, text, threadTimestamp string) {
 	// メンションを除去
 	cleanText := strings.TrimSpace(text)
 	if strings.HasPrefix(cleanText, "<@") {
@@ -25,14 +25,14 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 
 	log.Printf("Processing message from user %s", user)
 
-	// requestID は channel + threadTS で一意に識別
-	requestID := fmt.Sprintf("%s_%s", channel, threadTS)
+	// requestID は channel + threadTimestamp で一意に識別
+	requestID := fmt.Sprintf("%s_%s", channel, threadTimestamp)
 
 	// pendingRequests に保存
 	h.mu.Lock()
 	h.pendingRequests[requestID] = pendingRequest{
 		Channel:  channel,
-		ThreadTS: threadTS,
+		ThreadTimestamp: threadTimestamp,
 	}
 	h.mu.Unlock()
 
@@ -56,7 +56,7 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 	}
 
 	if len(options) == 0 {
-		h.sendMessage(channel, threadTS, "実行できる調査がありません。")
+		h.sendMessage(channel, threadTimestamp, "実行できる調査がありません。")
 		return
 	}
 
@@ -75,14 +75,23 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 		slack.NewActionBlock(requestID, selectElement),
 	}
 
-	_, _, err := h.slackClient.PostMessage(
+	_, selectMsgTS, err := h.slackClient.PostMessage(
 		channel,
 		slack.MsgOptionBlocks(blocks...),
-		slack.MsgOptionTS(threadTS),
+		slack.MsgOptionTS(threadTimestamp),
 	)
 	if err != nil {
 		log.Printf("Error posting select message: %v", err)
+		return
 	}
+
+	// セレクトボックスのメッセージ TS を保存（選択後に上書きするため）
+	h.mu.Lock()
+	if req, ok := h.pendingRequests[requestID]; ok {
+		req.SelectMessageTimestamp = selectMsgTS
+		h.pendingRequests[requestID] = req
+	}
+	h.mu.Unlock()
 }
 
 // handleBlockActions はブロックアクションを処理
@@ -114,9 +123,21 @@ func (h *Handler) handleBlockActions(ctx context.Context, callback slack.Interac
 		return
 	}
 
+	// セレクトボックスをテキストに置き換え
+	if req.SelectMessageTimestamp != "" {
+		_, _, _, err := h.slackClient.UpdateMessage(
+			req.Channel,
+			req.SelectMessageTimestamp,
+			slack.MsgOptionText(fmt.Sprintf("「%s」を実行します。", investigationName), false),
+		)
+		if err != nil {
+			log.Printf("Error updating select message: %v", err)
+		}
+	}
+
 	if len(investigation.Parameters) == 0 {
 		// パラメータなし → 直接実行
-		h.executeInvestigation(ctx, req.Channel, req.ThreadTS, investigationName, nil)
+		h.executeInvestigation(ctx, req.Channel, req.ThreadTimestamp, investigationName, nil)
 	} else {
 		// パラメータあり → モーダルを開く
 		h.openParameterModal(callback.TriggerID, investigation, req)
@@ -127,7 +148,7 @@ func (h *Handler) handleBlockActions(ctx context.Context, callback slack.Interac
 func (h *Handler) openParameterModal(triggerID string, investigation *config.InvestigationConfig, req pendingRequest) {
 	metadata := modalPrivateMetadata{
 		Channel:           req.Channel,
-		ThreadTS:          req.ThreadTS,
+		ThreadTimestamp:          req.ThreadTimestamp,
 		InvestigationName: investigation.Name,
 	}
 	metadataJSON, err := json.Marshal(metadata)
@@ -217,5 +238,5 @@ func (h *Handler) handleViewSubmission(ctx context.Context, callback slack.Inter
 		}
 	}
 
-	h.executeInvestigation(ctx, metadata.Channel, metadata.ThreadTS, metadata.InvestigationName, parameters)
+	h.executeInvestigation(ctx, metadata.Channel, metadata.ThreadTimestamp, metadata.InvestigationName, parameters)
 }
