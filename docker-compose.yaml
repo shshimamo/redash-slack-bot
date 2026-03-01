@@ -20,4 +20,4 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./configs/sample_data.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/sample_data.sql:/docker-entrypoint-initdb.d/init.sql
