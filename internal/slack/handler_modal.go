@@ -238,5 +238,17 @@ func (h *Handler) handleViewSubmission(ctx context.Context, callback slack.Inter
 		}
 	}
 
+	// 入力されたパラメータを表示
+	if len(parameters) > 0 {
+		var sb strings.Builder
+		sb.WriteString("パラメータ:\n")
+		for _, param := range investigation.Parameters {
+			if val, ok := parameters[param.Name]; ok {
+				sb.WriteString(fmt.Sprintf("• %s: %v\n", param.Name, val))
+			}
+		}
+		h.sendMessage(metadata.Channel, metadata.ThreadTimestamp, sb.String())
+	}
+
 	h.executeInvestigation(ctx, metadata.Channel, metadata.ThreadTimestamp, metadata.InvestigationName, parameters)
 }
