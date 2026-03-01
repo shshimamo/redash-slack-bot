@@ -39,6 +39,7 @@ type InvestigationConfig struct {
 	Queries             []QueryConfig            `yaml:"queries"`
 	Schemas             []string                 `yaml:"schemas"`
 	Documents           []string                 `yaml:"documents"`
+	AllowedGroups       []string                 `yaml:"allowed_groups"`
 }
 
 // ResolveParameterConfig はパラメータ解決クエリの定義

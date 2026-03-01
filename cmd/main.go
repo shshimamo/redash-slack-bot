@@ -21,9 +21,17 @@ func main() {
 	slackAppToken := mustGetEnv("SLACK_APP_TOKEN") // Socket Mode 用
 	anthropicAPIKey := mustGetEnv("ANTHROPIC_API_KEY")
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
+	groupsPath := getEnv("GROUPS_PATH", "configs/groups.yaml")
 	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
 	promptsDir := getEnv("PROMPTS_DIR", "configs/prompts")
 	documentsDir := getEnv("DOCUMENTS_DIR", "configs/documents")
+
+	// グループ設定読み込み
+	groups, err := config.LoadGroups(groupsPath)
+	if err != nil {
+		log.Fatalf("Failed to load groups: %v", err)
+	}
+	log.Printf("Loaded %d groups from config", len(groups.Groups))
 
 	// 設定ファイル読み込み
 	cfg, err := config.LoadConfig(configPath)
@@ -118,7 +126,7 @@ func main() {
 	log.Printf("LLM default model: %s", defaultModel)
 
 	// Slack ハンドラ初期化（Socket Mode）
-	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency, defaultQueryResultMaxBytes, defaultLLMInputMaxBytes, defaultTimeout, defaultModel)
+	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, groups, queryConcurrency, defaultQueryResultMaxBytes, defaultLLMInputMaxBytes, defaultTimeout, defaultModel)
 
 	// Context with cancel for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

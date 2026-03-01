@@ -39,6 +39,7 @@ type Handler struct {
 	llmClient           *llm.Client
 	redashClients       map[string]*redash.Client
 	config              *config.Config
+	groups              *config.Groups
 	pendingRequests     map[string]pendingRequest
 	mu                  sync.Mutex
 	queryConcurrency    int
@@ -55,6 +56,7 @@ func NewHandler(
 	llmClient *llm.Client,
 	redashClients map[string]*redash.Client,
 	cfg *config.Config,
+	groups *config.Groups,
 	queryConcurrency int,
 	defaultQueryResultMaxBytes int,
 	defaultLLMInputMaxBytes int,
@@ -73,6 +75,7 @@ func NewHandler(
 		llmClient:           llmClient,
 		redashClients:       redashClients,
 		config:              cfg,
+		groups:              groups,
 		pendingRequests:     make(map[string]pendingRequest),
 		queryConcurrency:    queryConcurrency,
 		defaultQueryResultMaxBytes: defaultQueryResultMaxBytes,

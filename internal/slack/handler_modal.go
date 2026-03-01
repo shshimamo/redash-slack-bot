@@ -43,13 +43,21 @@ func (h *Handler) processMessage(ctx context.Context, channel, user, text, threa
 		h.mu.Unlock()
 	})
 
-	// 調査選択のセレクトボックスを投稿
-	options := make([]*slack.OptionBlockObject, 0, len(h.config.Investigations))
+	// 実行権限のある調査のみ表示
+	var options []*slack.OptionBlockObject
 	for _, inv := range h.config.Investigations {
+		if !h.groups.IsMember(user, inv.AllowedGroups) {
+			continue
+		}
 		options = append(options, &slack.OptionBlockObject{
 			Text:  &slack.TextBlockObject{Type: slack.PlainTextType, Text: inv.Name},
 			Value: inv.Name,
 		})
+	}
+
+	if len(options) == 0 {
+		h.sendMessage(channel, threadTS, "実行できる調査がありません。")
+		return
 	}
 
 	selectElement := &slack.SelectBlockElement{

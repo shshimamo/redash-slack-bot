@@ -9,6 +9,7 @@ redash_instances:
 # query_result_max_bytes: クエリ1件あたりの結果サイズ上限 (bytes)。未指定は QUERY_RESULT_MAX_BYTES 環境変数を使用。0 で無制限
 # llm_input_max_bytes:    LLM への入力合計 (prompt + schema + documents + 全クエリ結果) のサイズ上限 (bytes)。未指定は LLM_INPUT_MAX_BYTES 環境変数を使用。0 で無制限
 # documents:             LLM に追加情報として渡すドキュメントファイル (configs/documents/ 配下)。仕様書やシーケンス図など
+# allowed_groups:        実行を許可するグループ名 (configs/groups.yaml で定義)。未指定または空の場合は全員拒否
 investigations:
   - name: "決済状況調査"
     description: "request_id に紐づく決済状況を総合的に調査"
