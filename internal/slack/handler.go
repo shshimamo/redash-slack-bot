@@ -42,9 +42,10 @@ type Handler struct {
 	pendingRequests     map[string]pendingRequest
 	mu                  sync.Mutex
 	queryConcurrency    int
-	queryResultMaxBytes int
-	llmInputMaxBytes    int
+	defaultQueryResultMaxBytes int
+	defaultLLMInputMaxBytes    int
 	defaultTimeout      time.Duration
+	defaultModel        string
 }
 
 // NewHandler は新しいハンドラを作成
@@ -55,9 +56,10 @@ func NewHandler(
 	redashClients map[string]*redash.Client,
 	cfg *config.Config,
 	queryConcurrency int,
-	queryResultMaxBytes int,
-	llmInputMaxBytes int,
+	defaultQueryResultMaxBytes int,
+	defaultLLMInputMaxBytes int,
 	defaultTimeout time.Duration,
+	defaultModel string,
 ) *Handler {
 	slackClient := slack.New(
 		botToken,
@@ -73,9 +75,10 @@ func NewHandler(
 		config:              cfg,
 		pendingRequests:     make(map[string]pendingRequest),
 		queryConcurrency:    queryConcurrency,
-		queryResultMaxBytes: queryResultMaxBytes,
-		llmInputMaxBytes:    llmInputMaxBytes,
+		defaultQueryResultMaxBytes: defaultQueryResultMaxBytes,
+		defaultLLMInputMaxBytes:    defaultLLMInputMaxBytes,
 		defaultTimeout:      defaultTimeout,
+		defaultModel:        defaultModel,
 	}
 }
 

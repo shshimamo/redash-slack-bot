@@ -41,7 +41,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	log.Printf("Executing investigation %q with %d parameters (timeout: %s)", investigation.Name, len(params), timeout)
 
 	// クエリ結果サイズ上限: investigation 指定 → デフォルトの順で適用
-	maxBytes := h.queryResultMaxBytes
+	maxBytes := h.defaultQueryResultMaxBytes
 	if investigation.QueryResultMaxBytes != nil {
 		maxBytes = *investigation.QueryResultMaxBytes
 	}
@@ -173,7 +173,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 	documentInfo := h.config.FormatInvestigationDocuments(investigation)
 
 	// LLM 入力合計サイズチェック: investigation 指定 → デフォルトの順で適用
-	maxLLMInput := h.llmInputMaxBytes
+	maxLLMInput := h.defaultLLMInputMaxBytes
 	if investigation.LLMInputMaxBytes != nil {
 		maxLLMInput = *investigation.LLMInputMaxBytes
 	}
@@ -189,8 +189,8 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTS, i
 		}
 	}
 
-	log.Printf("Analyzing results for investigation %q (%d queries)", investigation.Name, len(results))
-	analysis, err := h.llmClient.AnalyzeResults(ctx, results, systemPrompt, schemaInfo, documentInfo)
+	log.Printf("Analyzing results for investigation %q (%d queries) with model %q", investigation.Name, len(results), h.defaultModel)
+	analysis, err := h.llmClient.AnalyzeResults(ctx, h.defaultModel, results, systemPrompt, schemaInfo, documentInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
 		var sb strings.Builder

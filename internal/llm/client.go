@@ -24,9 +24,9 @@ func NewClient(apiKey string) *Client {
 }
 
 // Invoke は LLM にプロンプトを送信して応答を取得
-func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (string, error) {
+func (c *Client) Invoke(ctx context.Context, model, systemPrompt, userMessage string) (string, error) {
 	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model("claude-3-haiku-20240307"),
+		Model:     anthropic.Model(model),
 		MaxTokens: 4096,
 		System: []anthropic.TextBlockParam{
 			{Text: systemPrompt},
@@ -53,7 +53,7 @@ func (c *Client) Invoke(ctx context.Context, systemPrompt, userMessage string) (
 }
 
 // AnalyzeResults はクエリ結果を分析して要約を生成
-func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, systemPrompt, schemaInfo, documentInfo string) (string, error) {
+func (c *Client) AnalyzeResults(ctx context.Context, model string, results map[string]string, systemPrompt, schemaInfo, documentInfo string) (string, error) {
 	if schemaInfo != "" {
 		systemPrompt += "\n\n" + schemaInfo
 	}
@@ -67,5 +67,5 @@ func (c *Client) AnalyzeResults(ctx context.Context, results map[string]string, 
 		sb.WriteString(fmt.Sprintf("\n【%s】\n%s\n", name, result))
 	}
 
-	return c.Invoke(ctx, systemPrompt, sb.String())
+	return c.Invoke(ctx, model, systemPrompt, sb.String())
 }

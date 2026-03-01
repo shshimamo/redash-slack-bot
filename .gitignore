@@ -13,5 +13,8 @@ k8s/local/secret.yaml
 .vscode/
 *.swp
 
+# Claude Code
+.claude/settings.local.json
+
 # OS
 .DS_Store

@@ -81,26 +81,26 @@ func main() {
 	log.Printf("Query concurrency: %d", queryConcurrency)
 
 	// クエリ結果の最大サイズ（デフォルト: 10000 bytes、0 で無制限）
-	queryResultMaxBytes := 10000
+	defaultQueryResultMaxBytes := 10000
 	if v := os.Getenv("QUERY_RESULT_MAX_BYTES"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
 			log.Fatalf("QUERY_RESULT_MAX_BYTES must be a non-negative integer, got: %s", v)
 		}
-		queryResultMaxBytes = n
+		defaultQueryResultMaxBytes = n
 	}
-	log.Printf("Query result max bytes: %d", queryResultMaxBytes)
+	log.Printf("Query result max bytes: %d", defaultQueryResultMaxBytes)
 
 	// LLM 入力合計の最大サイズ（デフォルト: 50000 bytes、0 で無制限）
-	llmInputMaxBytes := 50000
+	defaultLLMInputMaxBytes := 50000
 	if v := os.Getenv("LLM_INPUT_MAX_BYTES"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {
 			log.Fatalf("LLM_INPUT_MAX_BYTES must be a non-negative integer, got: %s", v)
 		}
-		llmInputMaxBytes = n
+		defaultLLMInputMaxBytes = n
 	}
-	log.Printf("LLM input max bytes: %d", llmInputMaxBytes)
+	log.Printf("LLM input max bytes: %d", defaultLLMInputMaxBytes)
 
 	// タイムアウト設定（デフォルト: 120s）
 	defaultTimeout := 120 * time.Second
@@ -113,8 +113,12 @@ func main() {
 	}
 	log.Printf("Investigation default timeout: %s", defaultTimeout)
 
+	// LLM モデル設定（デフォルト: claude-haiku-4-5-20251001）
+	defaultModel := getEnv("LLM_MODEL", "claude-haiku-4-5-20251001")
+	log.Printf("LLM default model: %s", defaultModel)
+
 	// Slack ハンドラ初期化（Socket Mode）
-	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency, queryResultMaxBytes, llmInputMaxBytes, defaultTimeout)
+	handler := slack.NewHandler(slackBotToken, slackAppToken, llmClient, redashClients, cfg, queryConcurrency, defaultQueryResultMaxBytes, defaultLLMInputMaxBytes, defaultTimeout, defaultModel)
 
 	// Context with cancel for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
