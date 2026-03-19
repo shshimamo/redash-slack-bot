@@ -19,7 +19,6 @@ func main() {
 	// 環境変数から設定を読み込み
 	slackBotToken := mustGetEnv("SLACK_BOT_TOKEN")
 	slackAppToken := mustGetEnv("SLACK_APP_TOKEN") // Socket Mode 用
-	anthropicAPIKey := mustGetEnv("ANTHROPIC_API_KEY")
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
 	groupsPath := getEnv("GROUPS_PATH", "configs/groups.yaml")
 	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
@@ -60,9 +59,20 @@ func main() {
 		log.Printf("Warning: Failed to load investigation documents: %v", err)
 	}
 
-	// Anthropic クライアント初期化
-	llmClient := llm.NewClient(anthropicAPIKey)
-	log.Println("Anthropic client initialized (claude-3-haiku)")
+	// LLM クライアント初期化
+	provider := getEnv("LLM_PROVIDER", "anthropic")
+	var llmClient llm.Client
+	switch provider {
+	case "anthropic":
+		llmClient = llm.NewAnthropicClient(mustGetEnv("ANTHROPIC_API_KEY"))
+	case "bedrock":
+		llmClient = llm.NewBedrockClient()
+	case "openai":
+		llmClient = llm.NewOpenAIClient(mustGetEnv("OPENAI_API_KEY"))
+	default:
+		log.Fatalf("Unknown LLM_PROVIDER: %s (anthropic / bedrock / openai)", provider)
+	}
+	log.Printf("LLM provider: %s", provider)
 
 	// Redash クライアント初期化（redash_instances の定義に基づく）
 	redashClients := make(map[string]*redash.Client)

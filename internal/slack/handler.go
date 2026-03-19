@@ -37,7 +37,7 @@ const slackMessageMaxChars = 3000
 type Handler struct {
 	slackClient         *slack.Client
 	socketClient        *socketmode.Client
-	llmClient           *llm.Client
+	llmClient           llm.Client
 	redashClients       map[string]*redash.Client
 	config              *config.Config
 	groups              *config.Groups
@@ -54,7 +54,7 @@ type Handler struct {
 func NewHandler(
 	botToken string,
 	appToken string,
-	llmClient *llm.Client,
+	llmClient llm.Client,
 	redashClients map[string]*redash.Client,
 	cfg *config.Config,
 	groups *config.Groups,
