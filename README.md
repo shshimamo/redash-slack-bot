@@ -141,7 +141,27 @@ investigations:
 tbls out --format json postgres://user:pass@localhost:5432/mydb > configs/schemas/mydb.json
 ```
 
-### 7. 実行
+### 7. 追加ドキュメント設定（オプション）
+
+`configs/documents/` に任意のファイルを配置し、調査設定で `documents` に指定すると LLM に追加情報として渡せます。シーケンス図・仕様書・正常系データなど用途は自由です。
+
+```
+configs/documents/
+├── payment_sequence.md   # シーケンス図
+├── payment_spec.txt      # 仕様書
+└── normal_data.json      # 正常系データ
+```
+
+```yaml
+investigations:
+  - name: "決済状況調査"
+    documents:
+      - payment_sequence.md
+      - payment_spec.txt
+      - normal_data.json
+```
+
+### 8. 実行
 
 ```bash
 # ローカル実行
