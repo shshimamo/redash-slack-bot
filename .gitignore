@@ -8,9 +8,6 @@ bin/
 # K8s secrets
 k8s/local/secret.yaml
 
-# Groups (contains Slack user IDs)
-configs/groups.yaml
-
 # IDE
 .idea/
 .vscode/
