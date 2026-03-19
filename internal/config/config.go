@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"io/fs"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -70,9 +69,9 @@ type ParameterConfig struct {
 	Description string `yaml:"description"`
 }
 
-// LoadConfig は queries.yaml を読み込む
-func LoadConfig(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+// LoadConfig は fs.FS から設定を読み込む
+func LoadConfig(fsys fs.FS, path string) (*Config, error) {
+	data, err := fs.ReadFile(fsys, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -85,8 +84,8 @@ func LoadConfig(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-// LoadInvestigationSchemas は configs/schemas/ 配下のスキーマファイルを読み込む
-func (c *Config) LoadInvestigationSchemas(schemasDir string) error {
+// LoadInvestigationSchemas はスキーマファイルを読み込む
+func (c *Config) LoadInvestigationSchemas(fsys fs.FS, schemasDir string) error {
 	c.schemaCache = make(map[string]string)
 
 	// 全 investigation が参照するスキーマファイルを収集
@@ -99,8 +98,7 @@ func (c *Config) LoadInvestigationSchemas(schemasDir string) error {
 
 	// 各スキーマファイルを読み込む
 	for schemaFile := range seen {
-		path := filepath.Join(schemasDir, schemaFile)
-		data, err := os.ReadFile(path)
+		data, err := fs.ReadFile(fsys, schemasDir+"/"+schemaFile)
 		if err != nil {
 			return fmt.Errorf("failed to read schema file %s: %w", schemaFile, err)
 		}
@@ -111,8 +109,8 @@ func (c *Config) LoadInvestigationSchemas(schemasDir string) error {
 	return nil
 }
 
-// LoadInvestigationPrompts は configs/prompts/ 配下のプロンプトファイルを読み込む
-func (c *Config) LoadInvestigationPrompts(promptsDir string) error {
+// LoadInvestigationPrompts はプロンプトファイルを読み込む
+func (c *Config) LoadInvestigationPrompts(fsys fs.FS, promptsDir string) error {
 	c.promptCache = make(map[string]string)
 
 	// default.txt は常に読み込む
@@ -124,8 +122,7 @@ func (c *Config) LoadInvestigationPrompts(promptsDir string) error {
 	}
 
 	for file := range files {
-		path := filepath.Join(promptsDir, file)
-		data, err := os.ReadFile(path)
+		data, err := fs.ReadFile(fsys, promptsDir+"/"+file)
 		if err != nil {
 			return fmt.Errorf("failed to read prompt file %s: %w", file, err)
 		}
@@ -166,8 +163,8 @@ func (c *Config) FormatInvestigationSchemas(inv *InvestigationConfig) string {
 	return sb.String()
 }
 
-// LoadInvestigationDocuments は configs/documents/ 配下のドキュメントファイルを読み込む
-func (c *Config) LoadInvestigationDocuments(documentsDir string) error {
+// LoadInvestigationDocuments はドキュメントファイルを読み込む
+func (c *Config) LoadInvestigationDocuments(fsys fs.FS, documentsDir string) error {
 	c.documentCache = make(map[string]string)
 
 	// 全 investigation が参照するドキュメントファイルを収集
@@ -180,8 +177,7 @@ func (c *Config) LoadInvestigationDocuments(documentsDir string) error {
 
 	// 各ドキュメントファイルを読み込む
 	for docFile := range seen {
-		path := filepath.Join(documentsDir, docFile)
-		data, err := os.ReadFile(path)
+		data, err := fs.ReadFile(fsys, documentsDir+"/"+docFile)
 		if err != nil {
 			return fmt.Errorf("failed to read document file %s: %w", docFile, err)
 		}

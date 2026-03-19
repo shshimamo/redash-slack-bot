@@ -6,7 +6,6 @@ services:
     env_file:
       - .env
     volumes:
-      - ./configs:/app/configs:ro
       - ~/.aws:/home/appuser/.aws:ro
     environment:
       - AWS_PROFILE=${AWS_PROFILE:-default}

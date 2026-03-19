@@ -49,7 +49,6 @@ cp .env.example .env
 | `LLM_MODEL` | | 使用モデル（デフォルト: `claude-haiku-4-5-20251001`） |
 | `REDASH_URL` | ✅ | Redash の URL |
 | `REDASH_API_KEY` | ✅ | Redash API キー |
-| `CONFIG_PATH` | | 調査設定ファイルパス（デフォルト: `configs/queries.yaml`） |
 | `任意の環境変数名` | | グループメンバー。カンマ区切りの Slack ユーザー ID。`allowed_groups` に指定した名前と一致させる |
 | `QUERY_CONCURRENCY` | | クエリ並列実行数（デフォルト: `5`） |
 | `QUERY_RESULT_MAX_BYTES` | | クエリ結果の最大サイズ（デフォルト: `10000`、`0` で無制限） |

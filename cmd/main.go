@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shshimamo/redash-slack-bot/configs"
 	"github.com/shshimamo/redash-slack-bot/internal/config"
 	"github.com/shshimamo/redash-slack-bot/internal/llm"
 	"github.com/shshimamo/redash-slack-bot/internal/redash"
@@ -19,16 +20,12 @@ func main() {
 	// 環境変数から設定を読み込み
 	slackBotToken := mustGetEnv("SLACK_BOT_TOKEN")
 	slackAppToken := mustGetEnv("SLACK_APP_TOKEN") // Socket Mode 用
-	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
-	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
-	promptsDir := getEnv("PROMPTS_DIR", "configs/prompts")
-	documentsDir := getEnv("DOCUMENTS_DIR", "configs/documents")
 
 	// グループ設定（allowed_groups に指定した環境変数名からメンバーを解決）
 	groups := config.NewGroups()
 
-	// 設定ファイル読み込み
-	cfg, err := config.LoadConfig(configPath)
+	// 設定ファイル読み込み（バイナリに埋め込まれた configs/ を使用）
+	cfg, err := config.LoadConfig(configs.FS, "queries.yaml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -40,17 +37,17 @@ func main() {
 	}
 
 	// investigation ごとのスキーマファイル読み込み
-	if err := cfg.LoadInvestigationSchemas(schemasDir); err != nil {
+	if err := cfg.LoadInvestigationSchemas(configs.FS, "schemas"); err != nil {
 		log.Printf("Warning: Failed to load investigation schemas: %v", err)
 	}
 
 	// investigation ごとのプロンプトファイル読み込み
-	if err := cfg.LoadInvestigationPrompts(promptsDir); err != nil {
+	if err := cfg.LoadInvestigationPrompts(configs.FS, "prompts"); err != nil {
 		log.Printf("Warning: Failed to load investigation prompts: %v", err)
 	}
 
 	// investigation ごとのドキュメントファイル読み込み
-	if err := cfg.LoadInvestigationDocuments(documentsDir); err != nil {
+	if err := cfg.LoadInvestigationDocuments(configs.FS, "documents"); err != nil {
 		log.Printf("Warning: Failed to load investigation documents: %v", err)
 	}
 
