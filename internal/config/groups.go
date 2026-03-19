@@ -1,54 +1,29 @@
 package config
 
 import (
-	"fmt"
 	"os"
-
-	"gopkg.in/yaml.v3"
+	"strings"
 )
 
-// GroupConfig はユーザーグループの定義
-type GroupConfig struct {
-	Name    string   `yaml:"name"`
-	Members []string `yaml:"members"`
+// Groups はグループのアクセス制御を管理する
+type Groups struct{}
+
+// NewGroups は Groups を作成する
+func NewGroups() *Groups {
+	return &Groups{}
 }
 
-// Groups はグループ設定全体を保持
-type Groups struct {
-	Groups []GroupConfig `yaml:"groups"`
-	index  map[string]map[string]bool // groupName -> userID -> bool
-}
-
-// LoadGroups はグループ設定ファイルを読み込む
-func LoadGroups(path string) (*Groups, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read groups file: %w", err)
-	}
-
-	var g Groups
-	if err := yaml.Unmarshal(data, &g); err != nil {
-		return nil, fmt.Errorf("failed to parse groups file: %w", err)
-	}
-
-	// O(1) 検索のためインデックスを構築
-	g.index = make(map[string]map[string]bool)
-	for _, group := range g.Groups {
-		members := make(map[string]bool)
-		for _, m := range group.Members {
-			members[m] = true
-		}
-		g.index[group.Name] = members
-	}
-
-	return &g, nil
-}
-
-// IsMember は userID が groupNames のいずれかに所属しているか確認する
-func (g *Groups) IsMember(userID string, groupNames []string) bool {
-	for _, groupName := range groupNames {
-		if members, ok := g.index[groupName]; ok {
-			if members[userID] {
+// IsMember は userID が envVarNames のいずれかの環境変数に含まれているか確認する。
+// allowed_groups には環境変数名を指定し、値はカンマ区切りの Slack ユーザー ID。
+//
+// 例:
+//
+//	queries.yaml:  allowed_groups: [PAYMENT_TEAM_USERS]
+//	環境変数:      PAYMENT_TEAM_USERS=UXXXXXXXXX,UYYYYYYYYY
+func (g *Groups) IsMember(userID string, envVarNames []string) bool {
+	for _, envVarName := range envVarNames {
+		for _, m := range strings.Split(os.Getenv(envVarName), ",") {
+			if strings.TrimSpace(m) == userID {
 				return true
 			}
 		}

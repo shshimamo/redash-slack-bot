@@ -50,7 +50,7 @@ cp .env.example .env
 | `REDASH_URL` | ✅ | Redash の URL |
 | `REDASH_API_KEY` | ✅ | Redash API キー |
 | `CONFIG_PATH` | | 調査設定ファイルパス（デフォルト: `configs/queries.yaml`） |
-| `GROUPS_PATH` | | グループ設定ファイルパス（デフォルト: `configs/groups.yaml`） |
+| `任意の環境変数名` | | グループメンバー。カンマ区切りの Slack ユーザー ID。`allowed_groups` に指定した名前と一致させる |
 | `QUERY_CONCURRENCY` | | クエリ並列実行数（デフォルト: `5`） |
 | `QUERY_RESULT_MAX_BYTES` | | クエリ結果の最大サイズ（デフォルト: `10000`、`0` で無制限） |
 | `LLM_INPUT_MAX_BYTES` | | LLM 入力の最大サイズ（デフォルト: `50000`、`0` で無制限） |
@@ -82,18 +82,14 @@ LLM_MODEL=gpt-4o-mini
 
 ### 4. グループ設定
 
-`configs/groups.yaml` でアクセス制御用のグループを定義:
+`allowed_groups` には環境変数名を指定します。環境変数の値にカンマ区切りで Slack ユーザー ID を設定してください。
 
-```yaml
-groups:
-  - name: payment-team
-    members:
-      - UXXXXXXXXX  # Slack ユーザー ID（プロフィール → ︙ メニューから確認）
-  - name: analytics-team
-    members:
-      - UXXXXXXXXX
-      - UYYYYYYYYY
+```env
+PAYMENT_TEAM_USERS=UXXXXXXXXX,UYYYYYYYYY
+ANALYTICS_TEAM_USERS=UXXXXXXXXX
 ```
+
+> Slack ユーザー ID はプロフィール → ︙ メニューから確認できます。
 
 ### 5. 調査設定
 
@@ -111,7 +107,7 @@ investigations:
     redash_instance: "default"
     timeout: "120s"
     allowed_groups:
-      - payment-team        # 実行を許可するグループ（未指定は全員拒否）
+      - PAYMENT_TEAM_USERS  # 環境変数名を指定（未指定は全員拒否）
     schemas:
       - test_db.json        # configs/schemas/ 配下のスキーマファイル
     parameters:

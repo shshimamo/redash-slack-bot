@@ -20,17 +20,12 @@ func main() {
 	slackBotToken := mustGetEnv("SLACK_BOT_TOKEN")
 	slackAppToken := mustGetEnv("SLACK_APP_TOKEN") // Socket Mode 用
 	configPath := getEnv("CONFIG_PATH", "configs/queries.yaml")
-	groupsPath := getEnv("GROUPS_PATH", "configs/groups.yaml")
 	schemasDir := getEnv("SCHEMAS_DIR", "configs/schemas")
 	promptsDir := getEnv("PROMPTS_DIR", "configs/prompts")
 	documentsDir := getEnv("DOCUMENTS_DIR", "configs/documents")
 
-	// グループ設定読み込み
-	groups, err := config.LoadGroups(groupsPath)
-	if err != nil {
-		log.Fatalf("Failed to load groups: %v", err)
-	}
-	log.Printf("Loaded %d groups from config", len(groups.Groups))
+	// グループ設定（allowed_groups に指定した環境変数名からメンバーを解決）
+	groups := config.NewGroups()
 
 	// 設定ファイル読み込み
 	cfg, err := config.LoadConfig(configPath)

@@ -1,9 +1,0 @@
-groups:
-  - name: payment-team
-    members:
-      - UXXXXXXXXX   # Slack ユーザー ID（プロフィール → ︙ メニューから確認）
-
-  - name: analytics-team
-    members:
-      - UXXXXXXXXX
-      - UYYYYYYYYY
