@@ -1,0 +1,1 @@
+このファイルは configs/documents/ ディレクトリを go:embed するためのプレースホルダーです。
