@@ -5,9 +5,11 @@
 ## 機能
 
 - Slack でメンションして質問
-- LLM (Claude Haiku) が適切な「調査」を選択
-- 調査に紐づくクエリを実行し、結果を統合分析
+- LLM が適切な「調査」を選択してパラメータを抽出
+- 調査に紐づくクエリを Redash で実行し、結果を統合分析
 - LLM が結果を解析して回答
+- 複数の LLM プロバイダーに対応（Anthropic / AWS Bedrock / OpenAI）
+- グループ単位のアクセス制御
 
 ## セットアップ
 
@@ -36,15 +38,82 @@ cp .env.example .env
 
 `.env` を編集:
 
-### 4. 調査設定
+| 変数名 | 必須 | 説明 |
+|--------|------|------|
+| `SLACK_BOT_TOKEN` | ✅ | Slack Bot Token（`xoxb-...`） |
+| `SLACK_APP_TOKEN` | ✅ | Slack App-Level Token（`xapp-...`） |
+| `LLM_PROVIDER` | | LLM プロバイダー（`anthropic` / `bedrock` / `openai`、デフォルト: `anthropic`） |
+| `ANTHROPIC_API_KEY` | LLM_PROVIDER=anthropic 時 | Anthropic API キー |
+| `OPENAI_API_KEY` | LLM_PROVIDER=openai 時 | OpenAI API キー |
+| `AWS_DEFAULT_REGION` | LLM_PROVIDER=bedrock 時 | AWS リージョン（例: `us-east-1`） |
+| `LLM_MODEL` | | 使用モデル（デフォルト: `claude-haiku-4-5-20251001`） |
+| `REDASH_URL` | ✅ | Redash の URL |
+| `REDASH_API_KEY` | ✅ | Redash API キー |
+| `CONFIG_PATH` | | 調査設定ファイルパス（デフォルト: `configs/queries.yaml`） |
+| `GROUPS_PATH` | | グループ設定ファイルパス（デフォルト: `configs/groups.yaml`） |
+| `QUERY_CONCURRENCY` | | クエリ並列実行数（デフォルト: `5`） |
+| `QUERY_RESULT_MAX_BYTES` | | クエリ結果の最大サイズ（デフォルト: `10000`、`0` で無制限） |
+| `LLM_INPUT_MAX_BYTES` | | LLM 入力の最大サイズ（デフォルト: `50000`、`0` で無制限） |
+| `INVESTIGATION_TIMEOUT` | | 調査タイムアウト（デフォルト: `120s`） |
 
-`configs/queries.yaml` に調査を定義:
+#### LLM プロバイダー別の設定
+
+**Anthropic（デフォルト）**
+```env
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-your-api-key
+LLM_MODEL=claude-haiku-4-5-20251001
+```
+
+**AWS Bedrock**
+```env
+LLM_PROVIDER=bedrock
+AWS_DEFAULT_REGION=us-east-1
+LLM_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0
+# AWS 認証は環境変数 / ~/.aws/credentials / IAM ロールで自動解決
+```
+
+**OpenAI**
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-openai-api-key
+LLM_MODEL=gpt-4o-mini
+```
+
+### 4. グループ設定
+
+`configs/groups.yaml` でアクセス制御用のグループを定義:
 
 ```yaml
+groups:
+  - name: payment-team
+    members:
+      - UXXXXXXXXX  # Slack ユーザー ID（プロフィール → ︙ メニューから確認）
+  - name: analytics-team
+    members:
+      - UXXXXXXXXX
+      - UYYYYYYYYY
+```
+
+### 5. 調査設定
+
+`configs/queries.yaml` に Redash インスタンスと調査を定義:
+
+```yaml
+redash_instances:
+  - name: "default"
+    url_env: "REDASH_URL"
+    api_key_env: "REDASH_API_KEY"
+
 investigations:
-  # 複数クエリをまとめた調査
   - name: "決済状況調査"
     description: "request_id に紐づく決済状況を総合的に調査"
+    redash_instance: "default"
+    timeout: "120s"
+    allowed_groups:
+      - payment-team        # 実行を許可するグループ（未指定は全員拒否）
+    schemas:
+      - test_db.json        # configs/schemas/ 配下のスキーマファイル
     parameters:
       - name: request_id
         type: string
@@ -53,34 +122,26 @@ investigations:
       - id: 1
         name: "決済情報"
         description: "基本的な決済情報を取得"
+        required_parameters:
+          - request_id
       - id: 2
         name: "決済ログ"
         description: "決済処理のログを取得"
-
-  # 1つのクエリだけの調査も可能
-  - name: "決済ステータス集計"
-    description: "期間内の決済ステータスごとの件数を集計"
-    parameters:
-      - name: start_date
-        type: date
-        description: "開始日"
-    queries:
-      - id: 100
-        name: "ステータス集計"
+        required_parameters:
+          - request_id
 ```
 
-### 5. スキーマ設定（オプション）
+### 6. スキーマ設定（オプション）
 
-`configs/schema.json` に DB スキーマを設定すると、LLM がより適切にクエリを選択できます。
+`configs/schemas/` にDB スキーマを配置すると、LLM がより適切に分析できます。
 
-[tbls](https://github.com/k1LoW/tbls) で生成した `schema.json` をそのまま使用できます:
+[tbls](https://github.com/k1LoW/tbls) で生成した JSON をそのまま使用可能:
 
 ```bash
-# tbls でスキーマを出力
-tbls out --format json postgres://user:pass@localhost:5432/mydb > configs/schema.json
+tbls out --format json postgres://user:pass@localhost:5432/mydb > configs/schemas/mydb.json
 ```
 
-### 6. 実行
+### 7. 実行
 
 ```bash
 # ローカル実行
@@ -114,4 +175,3 @@ Slack で Bot をチャンネルに招待し、メンション:
 ```
 
 → 「決済ステータス集計」クエリが実行されます。
-
