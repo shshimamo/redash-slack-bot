@@ -175,6 +175,28 @@ make docker-build # Docker イメージビルド
 make docker-run   # Docker Compose で実行
 ```
 
+## 自分の環境で使う
+
+このリポジトリを fork して `configs/` を差し替えるだけで、自分の環境に合わせた Bot を作れます。
+
+```bash
+# 1. fork してクローン
+git clone https://github.com/your-org/redash-slack-bot
+
+# 2. configs/ を自分の環境に合わせて編集
+#    - queries.yaml    : 調査・クエリ設定
+#    - schemas/        : DB スキーマ（tbls で生成した JSON）
+#    - prompts/        : プロンプト
+#    - documents/      : 仕様書・シーケンス図など
+
+# 3. ビルド（設定ファイルがバイナリに埋め込まれる）
+make build
+
+# 4. 環境変数を設定して実行
+cp .env.example .env
+make run
+```
+
 ## 使い方
 
 Slack で Bot をチャンネルに招待し、メンション:
