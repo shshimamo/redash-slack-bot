@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redash-slack-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redash-slack-bot
+  template:
+    metadata:
+      labels:
+        app: redash-slack-bot
+    spec:
+      containers:
+        - name: redash-slack-bot
+          image: ghcr.io/shshimamo/redash-slack-bot:main
+          envFrom:
+            - secretRef:
+                name: redash-slack-bot-secret
