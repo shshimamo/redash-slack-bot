@@ -197,6 +197,55 @@ cp .env.example .env
 make run
 ```
 
+## ローカル Kubernetes で起動
+
+Docker Desktop の Kubernetes を使ってローカルで動かす手順です。
+
+### 1. Kubernetes を有効化
+
+Docker Desktop → Settings → Kubernetes → **Enable Kubernetes** → Apply & Restart
+
+```bash
+# 起動確認
+kubectl get nodes
+```
+
+### 2. GitHub Personal Access Token を作成
+
+GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) で `read:packages` 権限のトークンを作成。
+
+### 3. シークレットを登録
+
+```bash
+# ghcr.io の認証情報（PAT を使用）
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=YOUR_GITHUB_USERNAME \
+  --docker-password=YOUR_GITHUB_TOKEN
+
+# アプリケーションの環境変数
+cp k8s/local/secret.yaml.example k8s/local/secret.yaml
+# secret.yaml を編集して実際の値を入力
+kubectl apply -f k8s/local/secret.yaml
+```
+
+### 4. デプロイ
+
+```bash
+kubectl apply -f k8s/deployment.yaml
+
+# 起動確認
+kubectl get pods
+kubectl logs -f deployment/redash-slack-bot
+```
+
+### 便利なコマンド
+
+```bash
+kubectl rollout restart deployment/redash-slack-bot  # 再起動
+kubectl delete deployment redash-slack-bot            # 削除
+```
+
 ## 使い方
 
 Slack で Bot をチャンネルに招待し、メンション:

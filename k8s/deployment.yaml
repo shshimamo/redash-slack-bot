@@ -12,9 +12,12 @@ spec:
       labels:
         app: redash-slack-bot
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: redash-slack-bot
           image: ghcr.io/shshimamo/redash-slack-bot:main
+          imagePullPolicy: Always
           envFrom:
             - secretRef:
                 name: redash-slack-bot-secret
