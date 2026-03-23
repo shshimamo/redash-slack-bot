@@ -1,6 +1,6 @@
 display_information:
   name: Redash Bot
-  description: 自然言語で Redash クエリを実行・解析する Bot
+  description: Redash クエリを実行・LLM で解析する Bot
   background_color: "#4A154B"
 
 features:

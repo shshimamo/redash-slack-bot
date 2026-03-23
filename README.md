@@ -1,6 +1,6 @@
 # Redash Slack Bot
 
-自然言語で Redash クエリを実行・解析する Slack Bot。
+Redash クエリを実行・LLM で解析する Slack Bot。
 
 ## 機能
 
