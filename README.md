@@ -69,9 +69,12 @@ LLM_MODEL=claude-haiku-4-5-20251001
 ```env
 LLM_PROVIDER=bedrock
 AWS_DEFAULT_REGION=us-east-1
-# AWS_PROFILE=your-profile-name
 LLM_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0
-# 認証は環境変数 / ~/.aws/credentials / SSO / IAM ロールで自動解決
+# 認証方法（いずれかを設定）
+# AWS_ACCESS_KEY_ID=your-access-key
+# AWS_SECRET_ACCESS_KEY=your-secret-key
+# AWS_PROFILE=your-profile-name（SSO の場合は事前に aws sso login が必要）
+# EKS では IRSA で自動解決
 ```
 
 **OpenAI**
