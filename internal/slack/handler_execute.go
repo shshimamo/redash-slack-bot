@@ -62,6 +62,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTimes
 			log.Printf("Warning: resolve query %d failed: %v", resolve.QueryID, err)
 			continue
 		}
+		debugLog("Resolve query %d result: %d rows, raw: %s", resolve.QueryID, len(result.Rows), result.Rows)
 
 		if len(result.Rows) == 0 {
 			log.Printf("Warning: resolve query %d returned 0 rows, skipping outputs", resolve.QueryID)
@@ -74,6 +75,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTimes
 			log.Printf("Warning: failed to parse resolve query %d result: %v", resolve.QueryID, err)
 			continue
 		}
+		debugLog("Resolve query %d row: %v", resolve.QueryID, row)
 
 		for _, output := range resolve.Outputs {
 			if val, ok := row[output.Field]; ok {
@@ -151,6 +153,7 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTimes
 			}
 			results[name] = string(resultJSON)
 			log.Printf("Query %q (ID: %d) completed: %d rows, %d bytes", name, id, len(result.Rows), len(resultJSON))
+			debugLog("Query %q (ID: %d) result:\n%s", name, id, string(resultJSON))
 		}(q.name, q.id, q.queryParams)
 	}
 	wg.Wait()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -167,6 +168,13 @@ func (h *Handler) handleAppMention(ctx context.Context, ev *slackevents.AppMenti
 		threadTimestamp = ev.TimeStamp
 	}
 	h.processMessage(ctx, ev.Channel, ev.User, ev.Text, threadTimestamp)
+}
+
+// debugLog は DEBUG=true のときのみログを出力
+func debugLog(format string, v ...interface{}) {
+	if os.Getenv("DEBUG") == "true" {
+		log.Printf("[DEBUG] "+format, v...)
+	}
 }
 
 // sendMessage は Slack にメッセージを送信
