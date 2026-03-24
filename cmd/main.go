@@ -38,17 +38,17 @@ func main() {
 
 	// investigation ごとのスキーマファイル読み込み
 	if err := cfg.LoadInvestigationSchemas(configs.FS, "schemas"); err != nil {
-		log.Printf("Warning: Failed to load investigation schemas: %v", err)
+		log.Fatalf("Failed to load investigation schemas: %v", err)
 	}
 
 	// investigation ごとのプロンプトファイル読み込み
 	if err := cfg.LoadInvestigationPrompts(configs.FS, "prompts"); err != nil {
-		log.Printf("Warning: Failed to load investigation prompts: %v", err)
+		log.Fatalf("Failed to load investigation prompts: %v", err)
 	}
 
 	// investigation ごとのドキュメントファイル読み込み
 	if err := cfg.LoadInvestigationDocuments(configs.FS, "documents"); err != nil {
-		log.Printf("Warning: Failed to load investigation documents: %v", err)
+		log.Fatalf("Failed to load investigation documents: %v", err)
 	}
 
 	// LLM クライアント初期化
