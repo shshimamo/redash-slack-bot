@@ -46,6 +46,7 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | LLM_PROVIDER=anthropic 時 | Anthropic API キー |
 | `OPENAI_API_KEY` | LLM_PROVIDER=openai 時 | OpenAI API キー |
 | `AWS_DEFAULT_REGION` | LLM_PROVIDER=bedrock 時 | AWS リージョン（例: `us-east-1`） |
+| `AWS_PROFILE` | | AWS SSO プロファイル名（SSO 認証を使う場合） |
 | `LLM_MODEL` | | 使用モデル（デフォルト: `claude-haiku-4-5-20251001`） |
 | `REDASH_URL` | ✅ | Redash の URL |
 | `REDASH_API_KEY` | ✅ | Redash API キー |
@@ -68,8 +69,9 @@ LLM_MODEL=claude-haiku-4-5-20251001
 ```env
 LLM_PROVIDER=bedrock
 AWS_DEFAULT_REGION=us-east-1
+# AWS_PROFILE=your-profile-name
 LLM_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0
-# AWS 認証は環境変数 / ~/.aws/credentials / IAM ロールで自動解決
+# 認証は環境変数 / ~/.aws/credentials / SSO / IAM ロールで自動解決
 ```
 
 **OpenAI**
