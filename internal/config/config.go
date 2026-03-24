@@ -152,11 +152,13 @@ func (c *Config) FormatInvestigationSchemas(inv *InvestigationConfig) string {
 	}
 
 	var sb strings.Builder
+	sb.WriteString("=== DBスキーマ ===\n")
 	for _, schemaFile := range inv.Schemas {
 		content, ok := c.schemaCache[schemaFile]
 		if !ok {
 			continue
 		}
+		sb.WriteString(fmt.Sprintf("\n--- %s ---\n", schemaFile))
 		sb.WriteString(content)
 		sb.WriteString("\n")
 	}
@@ -195,11 +197,13 @@ func (c *Config) FormatInvestigationDocuments(inv *InvestigationConfig) string {
 	}
 
 	var sb strings.Builder
+	sb.WriteString("=== 追加ドキュメント ===\n")
 	for _, docFile := range inv.Documents {
 		content, ok := c.documentCache[docFile]
 		if !ok {
 			continue
 		}
+		sb.WriteString(fmt.Sprintf("\n--- %s ---\n", docFile))
 		sb.WriteString(content)
 		sb.WriteString("\n")
 	}
