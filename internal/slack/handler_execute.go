@@ -193,6 +193,14 @@ func (h *Handler) executeInvestigation(ctx context.Context, channel, threadTimes
 	}
 
 	log.Printf("Analyzing results for investigation %q (%d queries) with model %q", investigation.Name, len(results), h.defaultModel)
+	debugLog("LLM input: prompt=%d bytes, schemas=%v, documents=%v, queries=%v",
+		len(systemPrompt), investigation.Schemas, investigation.Documents, func() []string {
+			names := make([]string, 0, len(results))
+			for name := range results {
+				names = append(names, name)
+			}
+			return names
+		}())
 	analysis, err := h.llmClient.AnalyzeResults(ctx, h.defaultModel, results, systemPrompt, schemaInfo, documentInfo)
 	if err != nil {
 		log.Printf("Error analyzing results: %v", err)
