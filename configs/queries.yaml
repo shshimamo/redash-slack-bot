@@ -94,6 +94,8 @@ investigations:
     redash_instance: "default"
     timeout: "120s"
     query_result_max_bytes: 10000
+    allowed_groups:
+      - PAYMENT_TEAM_USERS
     schemas:
       - test_db.json
     parameters:
@@ -108,12 +110,15 @@ investigations:
             field: payment_id
           - name: user_id
             field: user_id
+          - name: payment_created_at
+            field: created_at
     queries:
       - id: 7
         name: "決済詳細"
         description: "ゲートウェイの処理結果など詳細情報"
         required_parameters:
           - payment_id
+          - payment_created_at
       - id: 8
         name: "ユーザー情報"
         description: "決済者のユーザー情報"

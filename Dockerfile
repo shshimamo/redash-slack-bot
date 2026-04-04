@@ -17,9 +17,8 @@ RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
-# バイナリと設定ファイルをコピー
+# バイナリをコピー（設定ファイルは go:embed でバイナリに埋め込み済み）
 COPY --from=builder /bot /app/bot
-COPY configs/ /app/configs/
 
 # 非rootユーザーで実行
 RUN adduser -D -g '' appuser
